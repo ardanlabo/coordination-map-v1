@@ -6,22 +6,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <!-- Leaflet CSS -->
-  <link
-    rel="stylesheet"
-    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-  />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
   <style>
-    html, body {
-      margin: 0;
-      padding: 0;
-      height: 100%;
-    }
-
-    #map {
-      width: 100%;
-      height: 100%;
-    }
+    html, body { margin: 0; padding: 0; height: 100%; }
+    #map { width: 100%; height: 100%; }
   </style>
 </head>
 <body>
@@ -33,7 +22,7 @@
 
 <script>
   /* =========================
-     1. INITIALISATION CARTE
+     1) INITIALISATION CARTE
      ========================= */
   const map = L.map('map').setView([10.5, 35.7], 7);
 
@@ -41,12 +30,14 @@
     attribution: '&copy; OpenStreetMap contributors'
   }).addTo(map);
 
+  // Fichiers (dans ton repo)
+  const ETH_ADM0_URL = 'ethiopia.geojson';
+  const ETH_ADM1_URL = 'data/eth_admin1.geojson';
+  const ETH_ADM3_BENISHANGUL_URL = 'data/eth_admin3_benishangul.geojson';
 
   /* =========================
-     2. FRONTIÈRE ÉTHIOPIE (ADM0)
+     2) FRONTIÈRE ÉTHIOPIE (ADM0)
      ========================= */
-  const ETH_ADM0_URL = 'ethiopia.geojson';
-
   fetch(ETH_ADM0_URL)
     .then(r => {
       if (!r.ok) throw new Error(`ADM0 HTTP ${r.status}`);
@@ -54,63 +45,62 @@
     })
     .then(country => {
       L.geoJSON(country, {
-        style: {
-          color: '#000000',
-          weight: 2,
-          opacity: 0.8,
-          fillOpacity: 0
-        }
+        style: { color: '#000000', weight: 2, opacity: 0.8, fillOpacity: 0 }
       }).addTo(map);
     })
     .catch(err => console.error('ADM0 load error:', err));
 
-
   /* =========================
-     3. BENISHANGUL-GUMUZ (ADM1)
+     3) BENISHANGUL-GUMUZ (ADM1)
      ========================= */
-  const ETH_ADM1_URL = 'data/eth_admin1.geojson';
-
   fetch(ETH_ADM1_URL)
     .then(r => {
       if (!r.ok) throw new Error(`ADM1 HTTP ${r.status}`);
       return r.json();
     })
     .then(fc => {
+      const BENISHANGUL_PCODE = 'ET06'; // validé dans ton fichier
 
-      // ✅ PCODE correct dans TON fichier
-      const BENISHANGUL_PCODE = 'ET06';
-
-      const benishangulFeatures = (fc.features || []).filter(f => {
+      const benFeatures = (fc.features || []).filter(f => {
         const p = f.properties || {};
         return p.adm1_pcode === BENISHANGUL_PCODE;
       });
 
-      if (!benishangulFeatures.length) {
-        console.error('Benishangul-Gumuz not found with PCODE ET06');
+      if (!benFeatures.length) {
+        console.error('Benishangul-Gumuz not found with PCODE', BENISHANGUL_PCODE);
         return;
       }
 
-      const benishangulFC = {
-        type: 'FeatureCollection',
-        features: benishangulFeatures
-      };
+      const benFC = { type: 'FeatureCollection', features: benFeatures };
 
-      const benLayer = L.geoJSON(benishangulFC, {
-        style: {
-          color: '#ff0000',
-          weight: 3,
-          opacity: 1,
-          fillOpacity: 0
-        }
+      const benLayer = L.geoJSON(benFC, {
+        style: { color: '#ff0000', weight: 3, opacity: 1, fillOpacity: 0 }
       }).addTo(map);
 
-      // Zoom automatique sur Benishangul-Gumuz
       map.fitBounds(benLayer.getBounds(), { padding: [30, 30] });
-
       benLayer.bindPopup('Benishangul-Gumuz Region (ADM1)');
     })
     .catch(err => console.error('ADM1 load error:', err));
 
+  /* =========================
+     4) WOREDAS BENISHANGUL (ADM3)
+     ========================= */
+  fetch(ETH_ADM3_BENISHANGUL_URL)
+    .then(r => {
+      if (!r.ok) throw new Error(`ADM3 HTTP ${r.status}`);
+      return r.json();
+    })
+    .then(fc => {
+      L.geoJSON(fc, {
+        style: { color: '#666666', weight: 1, opacity: 0.9, fillOpacity: 0 },
+        onEachFeature: (feature, layer) => {
+          const p = feature.properties || {};
+          const name = p.adm3_name || p.adm3_name1 || p.adm3_ref_name || 'Woreda';
+          layer.bindPopup(name);
+        }
+      }).addTo(map);
+    })
+    .catch(err => console.error('ADM3 load error:', err));
 </script>
 
 </body>
