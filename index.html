@@ -16,7 +16,58 @@
     html, body { margin: 0; padding: 0; height: 100%; }
     #map { width: 100%; height: 100%; }
 
-    /* Filters panel */
+    /* Sidebar (left) */
+    #sidebar{
+      position:absolute;
+      top:10px;
+      left:10px;
+      z-index:1000;
+      width:320px;
+      max-height: calc(100% - 20px);
+      background:#fff;
+      border-radius:8px;
+      box-shadow:0 0 8px rgba(0,0,0,0.25);
+      overflow:hidden;
+      font-size:13px;
+    }
+    .sidebar-header{
+      padding:10px;
+      border-bottom:1px solid #eee;
+      display:flex;
+      align-items:baseline;
+      justify-content:space-between;
+      gap:10px;
+    }
+    .sidebar-title{ font-weight:800; }
+    .sidebar-count{ color:#666; }
+    .sidebar-list{
+      overflow:auto;
+      max-height: calc(100% - 44px);
+    }
+    .item{
+      padding:10px;
+      border-bottom:1px solid #f0f0f0;
+      cursor:pointer;
+    }
+    .item:hover{ background:#f8f8f8; }
+    .item-top{
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+      margin-bottom:4px;
+    }
+    .badge{
+      padding:2px 8px;
+      border-radius:999px;
+      color:#fff;
+      font-size:12px;
+      line-height:18px;
+      white-space:nowrap;
+    }
+    .item-main{ font-weight:700; }
+    .item-sub{ color:#666; margin-top:2px; }
+
+    /* Filters panel (right) */
     #controls {
       position: absolute;
       top: 10px;
@@ -29,7 +80,6 @@
       width: 220px;
       font-size: 13px;
     }
-
     #controls h4 { margin: 6px 0; }
     #controls label { display: block; margin-top: 6px; font-weight: 600; }
     #controls select { width: 100%; }
@@ -49,7 +99,7 @@
     .popup-title { font-weight: 700; margin-bottom: 6px; }
     .popup-row { margin: 2px 0; }
 
-    /* ✅ Colored marker for clustering (divIcon) */
+    /* Colored marker for clustering (divIcon) */
     .status-pin{
       width:12px;height:12px;border-radius:50%;
       border:2px solid #fff;
@@ -60,6 +110,15 @@
 <body>
 
 <div id="map"></div>
+
+<!-- Sidebar -->
+<div id="sidebar">
+  <div class="sidebar-header">
+    <div class="sidebar-title">Interventions</div>
+    <div id="sidebar-count" class="sidebar-count">0 shown</div>
+  </div>
+  <div id="sidebar-list" class="sidebar-list"></div>
+</div>
 
 <!-- Filters -->
 <div id="controls">
@@ -211,7 +270,7 @@
   legend.addTo(map);
 
   /* =========================
-     INTERVENTIONS + FILTERS + TRUE CLUSTERING
+     INTERVENTIONS + FILTERS + CLUSTERING + SIDEBAR
      ========================= */
   let interventionsData = null;
 
@@ -221,6 +280,47 @@
     disableClusteringAtZoom: 12
   });
   map.addLayer(clusterGroup);
+
+  function renderSidebar(features, markersIndex) {
+    const list = document.getElementById('sidebar-list');
+    const count = document.getElementById('sidebar-count');
+    list.innerHTML = '';
+    count.textContent = `${features.length} shown`;
+
+    for (const f of features) {
+      const p = f.properties || {};
+      const id = String(p.record_id || p.id || `${p.org_name}-${p.site_name}-${p.period_month}`);
+      const status = String(p.status || '').toLowerCase();
+      const color = statusColor(status);
+
+      const org = p.org_name || 'Unknown';
+      const woreda = p.woreda || '-';
+      const site = p.site_name || '-';
+      const month = p.period_month || '-';
+
+      const row = document.createElement('div');
+      row.className = 'item';
+      row.dataset.id = id;
+
+      row.innerHTML = `
+        <div class="item-top">
+          <div class="item-main">${escapeHtml(org)}</div>
+          <div class="badge" style="background:${color}">${escapeHtml(status || '-')}</div>
+        </div>
+        <div class="item-sub">${escapeHtml(woreda)} — ${escapeHtml(site)}</div>
+        <div class="item-sub">${escapeHtml(month)}</div>
+      `;
+
+      row.addEventListener('click', () => {
+        const m = markersIndex.get(id);
+        if (!m) return;
+        map.setView(m.getLatLng(), Math.max(map.getZoom(), 11), { animate: true });
+        m.openPopup();
+      });
+
+      list.appendChild(row);
+    }
+  }
 
   function applyFilters() {
     const org = document.getElementById('filter-org').value;
@@ -237,20 +337,26 @@
       return true;
     });
 
+    const markersIndex = new Map();
+
     const layer = L.geoJSON(
       { type: 'FeatureCollection', features: filtered },
       {
-        // ✅ MUST be L.marker for clustering to show numbered bubbles
         pointToLayer: (feature, latlng) => {
-          return L.marker(latlng, { icon: statusIcon(feature.properties.status) });
+          const p = feature.properties || {};
+          const id = String(p.record_id || p.id || `${p.org_name}-${p.site_name}-${p.period_month}`);
+          const marker = L.marker(latlng, { icon: statusIcon(p.status) });
+          markersIndex.set(id, marker);
+          return marker;
         },
-        onEachFeature: (feature, l) => {
-          l.bindPopup(interventionPopup(feature.properties || {}));
+        onEachFeature: (feature, marker) => {
+          marker.bindPopup(interventionPopup(feature.properties || {}));
         }
       }
     );
 
     clusterGroup.addLayer(layer);
+    renderSidebar(filtered, markersIndex);
   }
 
   fetch(INTERVENTIONS_URL)
