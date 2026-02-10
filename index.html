@@ -12,7 +12,7 @@
     html, body { margin: 0; padding: 0; height: 100%; }
     #map { width: 100%; height: 100%; }
 
-    /* Controls panel */
+    /* Filters panel */
     #controls {
       position: absolute;
       top: 10px;
@@ -27,19 +27,32 @@
     }
 
     #controls h4 { margin: 6px 0; }
-    #controls label { display: block; margin-top: 6px; font-weight: 600; }
+    #controls label {
+      display: block;
+      margin-top: 6px;
+      font-weight: 600;
+    }
     #controls select { width: 100%; }
 
-    .legend-row { display: flex; align-items: center; margin: 4px 0; }
+    /* Legend */
+    .legend-row {
+      display: flex;
+      align-items: center;
+      margin: 4px 0;
+    }
     .dot {
-      width: 12px; height: 12px; border-radius: 50%;
-      display: inline-block; margin-right: 6px;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 6px;
     }
     .dot.planned { background: #808080; }
     .dot.ongoing { background: #1f77b4; }
     .dot.completed { background: #2ca02c; }
     .dot.paused { background: #ff7f0e; }
 
+    /* Popup */
     .popup-title { font-weight: 700; margin-bottom: 6px; }
     .popup-row { margin: 2px 0; }
   </style>
@@ -48,6 +61,7 @@
 
 <div id="map"></div>
 
+<!-- Filters -->
 <div id="controls">
   <h4>Filters</h4>
 
@@ -69,14 +83,6 @@
   <select id="filter-month">
     <option value="">All</option>
   </select>
-
-  <hr/>
-
-  <h4>Legend</h4>
-  <div class="legend-row"><span class="dot planned"></span> Planned</div>
-  <div class="legend-row"><span class="dot ongoing"></span> Ongoing</div>
-  <div class="legend-row"><span class="dot completed"></span> Completed</div>
-  <div class="legend-row"><span class="dot paused"></span> Paused</div>
 </div>
 
 <!-- Leaflet JS -->
@@ -84,13 +90,16 @@
 
 <script>
   /* =========================
-     BASE + MAP
+     BASE PATH (GitHub Pages safe)
      ========================= */
   const BASE = window.location.pathname.endsWith('/')
     ? window.location.pathname
     : window.location.pathname.replace(/\/[^\/]*$/, '/');
   const url = (p) => BASE + p.replace(/^\//, '');
 
+  /* =========================
+     MAP
+     ========================= */
   const map = L.map('map').setView([10.5, 35.7], 7);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; OpenStreetMap contributors'
@@ -101,6 +110,9 @@
   const ETH_ADM3_URL = url('data/eth_admin3_benishangul.geojson');
   const INTERVENTIONS_URL = url('data/interventions_benishangul_mock.geojson');
 
+  /* =========================
+     HELPERS
+     ========================= */
   function statusColor(status) {
     const s = String(status || '').toLowerCase();
     if (s === 'planned') return '#808080';
@@ -112,8 +124,10 @@
 
   function escapeHtml(str) {
     return String(str ?? '')
-      .replace(/&/g,'&amp;').replace(/</g,'&lt;')
-      .replace(/>/g,'&gt;').replace(/"/g,'&quot;')
+      .replace(/&/g,'&amp;')
+      .replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;')
       .replace(/'/g,'&#039;');
   }
 
@@ -131,24 +145,25 @@
   }
 
   /* =========================
-     ADM0
+     ADM0 – Ethiopia
      ========================= */
   fetch(ETH_ADM0_URL).then(r=>r.json()).then(fc=>{
     L.geoJSON(fc,{style:{color:'#000',weight:2,fillOpacity:0}}).addTo(map);
   });
 
   /* =========================
-     ADM1 Benishangul
+     ADM1 – Benishangul-Gumuz
      ========================= */
   fetch(ETH_ADM1_URL).then(r=>r.json()).then(fc=>{
     const ben = fc.features.filter(f=>f.properties?.adm1_pcode==='ET06');
-    const layer = L.geoJSON({type:'FeatureCollection',features:ben},
-      {style:{color:'#ff0000',weight:3,fillOpacity:0}}).addTo(map);
+    const layer = L.geoJSON({type:'FeatureCollection',features:ben},{
+      style:{color:'#ff0000',weight:3,fillOpacity:0}
+    }).addTo(map);
     map.fitBounds(layer.getBounds(),{padding:[30,30]});
   });
 
   /* =========================
-     ADM3 Woredas
+     ADM3 – Woredas
      ========================= */
   fetch(ETH_ADM3_URL).then(r=>r.json()).then(fc=>{
     L.geoJSON(fc,{
@@ -176,17 +191,19 @@
 
     const filtered = interventionsData.features.filter(f=>{
       const p = f.properties || {};
-      if (org && p.org_name!==org) return false;
-      if (status && String(p.status).toLowerCase()!==status) return false;
-      if (month && p.period_month!==month) return false;
+      if (org && p.org_name !== org) return false;
+      if (status && String(p.status).toLowerCase() !== status) return false;
+      if (month && p.period_month !== month) return false;
       return true;
     });
 
     interventionsLayer = L.geoJSON(
       {type:'FeatureCollection',features:filtered},{
         pointToLayer:(f,ll)=>{
-          const c=statusColor(f.properties.status);
-          return L.circleMarker(ll,{radius:6,color:c,fillColor:c,fillOpacity:0.9,weight:2});
+          const c = statusColor(f.properties.status);
+          return L.circleMarker(ll,{
+            radius:6,color:c,fillColor:c,fillOpacity:0.9,weight:2
+          });
         },
         onEachFeature:(f,l)=>l.bindPopup(interventionPopup(f.properties))
       }
@@ -200,17 +217,44 @@
     const months=[...new Set(fc.features.map(f=>f.properties.period_month))].sort();
 
     const orgSel=document.getElementById('filter-org');
-    orgs.forEach(o=>{const opt=document.createElement('option');opt.value=o;opt.textContent=o;orgSel.appendChild(opt);});
+    orgs.forEach(o=>{
+      const opt=document.createElement('option');
+      opt.value=o; opt.textContent=o; orgSel.appendChild(opt);
+    });
 
     const monthSel=document.getElementById('filter-month');
-    months.forEach(m=>{const opt=document.createElement('option');opt.value=m;opt.textContent=m;monthSel.appendChild(opt);});
-
-    ['filter-org','filter-status','filter-month'].forEach(id=>{
-      document.getElementById(id).addEventListener('change',applyFilters);
+    months.forEach(m=>{
+      const opt=document.createElement('option');
+      opt.value=m; opt.textContent=m; monthSel.appendChild(opt);
     });
+
+    ['filter-org','filter-status','filter-month']
+      .forEach(id=>document.getElementById(id).addEventListener('change',applyFilters));
 
     applyFilters();
   });
+
+  /* =========================
+     LEGEND (Leaflet control)
+     ========================= */
+  const legend = L.control({ position: 'bottomright' });
+  legend.onAdd = function () {
+    const div = L.DomUtil.create('div');
+    div.style.background = 'white';
+    div.style.padding = '8px';
+    div.style.borderRadius = '6px';
+    div.style.boxShadow = '0 0 6px rgba(0,0,0,0.3)';
+    div.style.fontSize = '13px';
+    div.innerHTML = `
+      <strong>Status</strong>
+      <div class="legend-row"><span class="dot planned"></span> Planned</div>
+      <div class="legend-row"><span class="dot ongoing"></span> Ongoing</div>
+      <div class="legend-row"><span class="dot completed"></span> Completed</div>
+      <div class="legend-row"><span class="dot paused"></span> Paused</div>
+    `;
+    return div;
+  };
+  legend.addTo(map);
 </script>
 
 </body>
