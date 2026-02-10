@@ -77,8 +77,8 @@
     })
     .then(fc => {
 
-      // ✅ PCODE OCHA officiel pour Benishangul-Gumuz
-      const BENISHANGUL_PCODE = 'ET03';
+      // ✅ PCODE correct dans TON fichier
+      const BENISHANGUL_PCODE = 'ET06';
 
       const benishangulFeatures = (fc.features || []).filter(f => {
         const p = f.properties || {};
@@ -86,7 +86,7 @@
       });
 
       if (!benishangulFeatures.length) {
-        console.error('Benishangul-Gumuz not found by PCODE');
+        console.error('Benishangul-Gumuz not found with PCODE ET06');
         return;
       }
 
@@ -104,10 +104,10 @@
         }
       }).addTo(map);
 
-      // Zoom automatique sur Benishangul
+      // Zoom automatique sur Benishangul-Gumuz
       map.fitBounds(benLayer.getBounds(), { padding: [30, 30] });
 
-      benLayer.bindPopup('Benishangul-Gumuz (ADM1)');
+      benLayer.bindPopup('Benishangul-Gumuz Region (ADM1)');
     })
     .catch(err => console.error('ADM1 load error:', err));
 
