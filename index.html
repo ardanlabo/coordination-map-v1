@@ -6,7 +6,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <!-- Leaflet CSS -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  />
 
   <style>
     html, body {
@@ -74,25 +77,16 @@
     })
     .then(fc => {
 
-      const tokens = ['benishangul', 'gumuz'];
+      // ✅ PCODE OCHA officiel pour Benishangul-Gumuz
+      const BENISHANGUL_PCODE = 'ET03';
 
       const benishangulFeatures = (fc.features || []).filter(f => {
         const p = f.properties || {};
-        const name = (
-          p.adm1_name1 ||     // anglais (COD-AB)
-          p.adm1_name ||      // local
-          p.adm1_ref_name ||  // fallback
-          ''
-        ).toLowerCase();
-
-        return tokens.every(t => name.includes(t));
+        return p.adm1_pcode === BENISHANGUL_PCODE;
       });
 
       if (!benishangulFeatures.length) {
-        console.error(
-          'Benishangul-Gumuz not found. Property keys:',
-          Object.keys((fc.features?.[0]?.properties) || {})
-        );
+        console.error('Benishangul-Gumuz not found by PCODE');
         return;
       }
 
@@ -113,7 +107,7 @@
       // Zoom automatique sur Benishangul
       map.fitBounds(benLayer.getBounds(), { padding: [30, 30] });
 
-      benLayer.bindPopup('Benishangul-Gumuz Region (ADM1)');
+      benLayer.bindPopup('Benishangul-Gumuz (ADM1)');
     })
     .catch(err => console.error('ADM1 load error:', err));
 
