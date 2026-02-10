@@ -5,107 +5,74 @@
   <title>Coordination GIS – Benishangul-Gumuz</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <!-- Leaflet CSS -->
-  <link
-    rel="stylesheet"
-    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-  />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
   <style>
-    html, body {
-      margin: 0;
-      padding: 0;
-      height: 100%;
-    }
-
-    #map {
-      width: 100%;
-      height: 100%;
-    }
+    html, body { margin: 0; padding: 0; height: 100%; }
+    #map { width: 100%; height: 100%; }
   </style>
 </head>
 <body>
 
 <div id="map"></div>
 
-<!-- Leaflet JS -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
 <script>
-  /* =========================
-     1. INITIALISATION DE LA CARTE
-     ========================= */
-  const map = L.map('map');
+  // ✅ IMPORTANT: centre/zoom par défaut (évite l’écran gris si fetch fail)
+  const map = L.map('map').setView([10.5, 35.7], 7);
 
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; OpenStreetMap contributors'
   }).addTo(map);
 
+  // --- URLs (mets ici le bon nom de fichier ADM0) ---
+  const ETH_ADM0_URL = 'ethiopia.geojson'; // ou 'ethiopia.geojson.json' si c’est ton vrai fichier
+  const ETH_ADM1_URL = 'data/eth_admin1.geojson';
 
-  /* =========================
-     2. FRONTIÈRE ÉTHIOPIE (ADM0)
-     ========================= */
-  fetch('ethiopia.geojson')
-    .then(r => r.json())
+  // 1) Frontière Éthiopie (ADM0)
+  fetch(ETH_ADM0_URL)
+    .then(r => {
+      if (!r.ok) throw new Error(`ADM0 HTTP ${r.status} on ${ETH_ADM0_URL}`);
+      return r.json();
+    })
     .then(country => {
       L.geoJSON(country, {
-        style: {
-          color: '#000000',
-          weight: 2,
-          opacity: 0.8,
-          fillOpacity: 0
-        }
+        style: { color: '#000000', weight: 2, opacity: 0.8, fillOpacity: 0 }
       }).addTo(map);
     })
     .catch(err => console.error('ADM0 load error:', err));
 
-
-  /* =========================
-     3. FRONTIÈRE BENISHANGUL-GUMUZ (ADM1)
-     ========================= */
-  fetch('data/eth_admin1.geojson')
-    .then(r => r.json())
+  // 2) Benishangul-Gumuz (ADM1) + zoom dessus
+  fetch(ETH_ADM1_URL)
+    .then(r => {
+      if (!r.ok) throw new Error(`ADM1 HTTP ${r.status} on ${ETH_ADM1_URL}`);
+      return r.json();
+    })
     .then(fc => {
-
       const tokens = ['benishangul', 'gumuz'];
 
-      const benishangulFeatures = (fc.features || []).filter(f => {
+      const benFeatures = (fc.features || []).filter(f => {
         const p = f.properties || {};
-        const name =
-          (p.ADM1_EN || p.NAME_1 || p.NAME || '').toLowerCase();
+        const name = (p.ADM1_EN || p.NAME_1 || p.NAME || '').toLowerCase();
         return tokens.every(t => name.includes(t));
       });
 
-      if (!benishangulFeatures.length) {
-        console.error(
-          'Benishangul-Gumuz not found. Property keys:',
-          Object.keys(fc.features[0].properties)
-        );
-        return;
+      if (!benFeatures.length) {
+        console.error('Benishangul-Gumuz not found. Example keys:',
+          Object.keys((fc.features?.[0]?.properties) || {}));
+        return; // on garde le setView par défaut
       }
 
-      const benishangulFC = {
-        type: 'FeatureCollection',
-        features: benishangulFeatures
-      };
+      const benFC = { type: 'FeatureCollection', features: benFeatures };
 
-      const benLayer = L.geoJSON(benishangulFC, {
-        style: {
-          color: '#ff0000',
-          weight: 3,
-          opacity: 1,
-          fillOpacity: 0
-        }
+      const benLayer = L.geoJSON(benFC, {
+        style: { color: '#ff0000', weight: 3, opacity: 1, fillOpacity: 0 }
       }).addTo(map);
 
-      // Zoom automatique sur le Benishangul
       map.fitBounds(benLayer.getBounds(), { padding: [30, 30] });
-
-      // Popup de contrôle
       benLayer.bindPopup('Benishangul-Gumuz Region (ADM1)');
     })
     .catch(err => console.error('ADM1 load error:', err));
-
 </script>
 
 </body>
