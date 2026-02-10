@@ -48,6 +48,13 @@
     /* Popup */
     .popup-title { font-weight: 700; margin-bottom: 6px; }
     .popup-row { margin: 2px 0; }
+
+    /* ✅ Colored marker for clustering (divIcon) */
+    .status-pin{
+      width:12px;height:12px;border-radius:50%;
+      border:2px solid #fff;
+      box-shadow:0 0 2px rgba(0,0,0,0.5);
+    }
   </style>
 </head>
 <body>
@@ -117,6 +124,16 @@
     return '#000000';
   }
 
+  function statusIcon(status) {
+    const c = statusColor(status);
+    return L.divIcon({
+      className: '',
+      html: `<div class="status-pin" style="background:${c}"></div>`,
+      iconSize: [12, 12],
+      iconAnchor: [6, 6]
+    });
+  }
+
   function escapeHtml(str) {
     return String(str ?? '')
       .replace(/&/g,'&amp;')
@@ -150,7 +167,7 @@
      ADM1 – Benishangul-Gumuz
      ========================= */
   fetch(ETH_ADM1_URL).then(r=>r.json()).then(fc=>{
-    const ben = fc.features.filter(f=>f.properties?.adm1_pcode==='ET06');
+    const ben = (fc.features || []).filter(f=>f.properties?.adm1_pcode==='ET06');
     const layer = L.geoJSON({type:'FeatureCollection',features:ben},{
       style:{color:'#ff0000',weight:3,fillOpacity:0}
     }).addTo(map);
@@ -194,11 +211,10 @@
   legend.addTo(map);
 
   /* =========================
-     INTERVENTIONS + FILTERS + CLUSTERING
+     INTERVENTIONS + FILTERS + TRUE CLUSTERING
      ========================= */
   let interventionsData = null;
 
-  // Cluster group (une fois)
   const clusterGroup = L.markerClusterGroup({
     showCoverageOnHover: false,
     spiderfyOnMaxZoom: true,
@@ -211,7 +227,6 @@
     const status = document.getElementById('filter-status').value;
     const month = document.getElementById('filter-month').value;
 
-    // On vide le cluster à chaque changement de filtre
     clusterGroup.clearLayers();
 
     const filtered = interventionsData.features.filter(f => {
@@ -225,15 +240,9 @@
     const layer = L.geoJSON(
       { type: 'FeatureCollection', features: filtered },
       {
+        // ✅ MUST be L.marker for clustering to show numbered bubbles
         pointToLayer: (feature, latlng) => {
-          const c = statusColor(feature.properties.status);
-          return L.circleMarker(latlng, {
-            radius: 6,
-            color: c,
-            fillColor: c,
-            fillOpacity: 0.9,
-            weight: 2
-          });
+          return L.marker(latlng, { icon: statusIcon(feature.properties.status) });
         },
         onEachFeature: (feature, l) => {
           l.bindPopup(interventionPopup(feature.properties || {}));
@@ -241,7 +250,6 @@
       }
     );
 
-    // On ajoute au cluster (pas directement à la map)
     clusterGroup.addLayer(layer);
   }
 
