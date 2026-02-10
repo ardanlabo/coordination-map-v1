@@ -53,7 +53,7 @@
 
       const benFeatures = (fc.features || []).filter(f => {
         const p = f.properties || {};
-        const name = (p.ADM1_EN || p.NAME_1 || p.NAME || '').toLowerCase();
+        const name = (p.adm1_name || p.ADM1_EN || p.NAME_1 || p.NAME || '').toLowerCase();
         return tokens.every(t => name.includes(t));
       });
 
