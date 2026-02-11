@@ -126,6 +126,38 @@
       text-overflow:ellipsis;
       white-space:nowrap;
     }
+
+    /* Status filter row */
+    .filter-row{
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+      align-items:center;
+      margin:10px 0 10px 0;
+      padding:8px 10px;
+      border:1px solid #eee;
+      border-radius:10px;
+      background:#fafafa;
+      font-size:13px;
+    }
+    .filter-chip{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      background:#fff;
+      border:1px solid #e9e9e9;
+      border-radius:999px;
+      padding:4px 10px;
+      user-select:none;
+      cursor:pointer;
+    }
+    .filter-chip input{ transform: translateY(1px); }
+    .filter-spacer{ flex:1; }
+    #timeline-count{
+      color:#555;
+      font-weight:800;
+      white-space:nowrap;
+    }
   </style>
 </head>
 <body>
@@ -141,23 +173,57 @@
 
   <div id="content">
     <div class="grid">
+      <!-- LEFT: Timeline -->
       <div class="card">
         <h2>Timeline (by month)</h2>
-        <div class="muted" style="margin-bottom:10px;">
-          Scrollable list of activities grouped by <code>period_month</code> (latest first).
+        <div class="muted">
+          Scrollable list grouped by <code>period_month</code> (latest first). Filters apply only to this timeline.
         </div>
+
+        <!-- NEW: Status tick-box filters -->
+        <div class="filter-row" aria-label="Status filters">
+          <label class="filter-chip" title="Show completed">
+            <input type="checkbox" class="status-filter" value="completed" checked />
+            completed
+          </label>
+          <label class="filter-chip" title="Show ongoing">
+            <input type="checkbox" class="status-filter" value="ongoing" checked />
+            ongoing
+          </label>
+          <label class="filter-chip" title="Show planned">
+            <input type="checkbox" class="status-filter" value="planned" checked />
+            planned
+          </label>
+          <label class="filter-chip" title="Show paused">
+            <input type="checkbox" class="status-filter" value="paused" checked />
+            paused
+          </label>
+
+          <span class="filter-spacer"></span>
+          <span id="timeline-count">0 shown</span>
+        </div>
+
         <div id="timeline"></div>
       </div>
 
+      <!-- RIGHT: Data quality -->
       <div class="card">
-        <h2>Data quality (placeholder)</h2>
-        <div class="muted">
-          Next step: add freshness KPIs and charts here.
+        <h2>Data quality — last org update</h2>
+        <div class="muted" style="margin-bottom:10px;">
+          Latest <code>last_update</code> per organisation (global). Dot colors: green ≤7d, orange 8–21d, black &gt;21d, grey n/a.
         </div>
+        <div id="org-quality" style="
+          max-height: 520px;
+          overflow:auto;
+          border:1px solid #eee;
+          border-radius:10px;
+          background:#fff;
+        "></div>
       </div>
     </div>
   </div>
 
+  <!-- Minimap -->
   <div id="minimap-wrap" title="Click to open the full map">
     <div id="minimap-badge">Benishangul-Gumuz</div>
     <div id="minimap"></div>
@@ -179,6 +245,9 @@
   const ETH_ADM1_URL = url('data/eth_admin1.geojson');
   const INTERVENTIONS_URL = url('data/interventions_benishangul_mock.geojson');
 
+  // Hold data once loaded
+  let allFeatures = [];
+
   /* =========================
      Buttons / navigation
      ========================= */
@@ -193,7 +262,7 @@
   });
 
   /* =========================
-     Helpers (timeline)
+     Helpers
      ========================= */
   function escapeHtml(str) {
     return String(str ?? '')
@@ -207,12 +276,14 @@
   function parseDateLoose(v) {
     if (!v) return null;
     const s = String(v).trim();
+    // YYYY-MM-DD or YYYY/MM/DD
     const m = s.match(/^(\d{4})[-\/](\d{2})[-\/](\d{2})/);
     if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
     const d = new Date(s);
     return isNaN(d) ? null : d;
   }
 
+  // For TIMELINE dot (green/orange/red) — you already use this logic on the map
   function freshnessFromLastUpdate(lastUpdate) {
     const d = parseDateLoose(lastUpdate);
     if (!d) return { color:'#bdbdbd', title:'No last_update', days:null };
@@ -221,6 +292,19 @@
     if (days <= 7)  return { color:'#2ca02c', title:`${days} day(s) old`, days };
     if (days <= 21) return { color:'#ff7f0e', title:`${days} day(s) old`, days };
     return { color:'#d62728', title:`${days} day(s) old`, days };
+  }
+
+  // For ORG table dot (green/orange/BLACK), per your requirement
+  function orgFreshnessFromLastUpdate(lastUpdate) {
+    const d = parseDateLoose(lastUpdate);
+    if (!d) return { color:'#bdbdbd', title:'No last_update', days:null, dateStr:'n/a' };
+
+    const days = Math.floor((new Date() - d) / (1000*60*60*24));
+    if (!isFinite(days) || days < 0) return { color:'#bdbdbd', title:'Invalid last_update', days:null, dateStr:'n/a' };
+
+    if (days <= 7)  return { color:'#2ca02c', title:`${days} day(s) old`, days, dateStr: String(lastUpdate) };
+    if (days <= 21) return { color:'#ff7f0e', title:`${days} day(s) old`, days, dateStr: String(lastUpdate) };
+    return { color:'#000000', title:`${days} day(s) old`, days, dateStr: String(lastUpdate) }; // noir
   }
 
   function statusColor(status) {
@@ -232,20 +316,43 @@
     return '#000000';
   }
 
+  function getSelectedStatuses() {
+    const checks = document.querySelectorAll('.status-filter');
+    const selected = new Set();
+    checks.forEach(cb => { if (cb.checked) selected.add(cb.value); });
+    return selected;
+  }
+
+  /* =========================
+     Timeline render (with status filters)
+     ========================= */
   function renderTimeline(features) {
     const el = document.getElementById('timeline');
+    const countEl = document.getElementById('timeline-count');
     if (!el) return;
+
+    const selectedStatuses = getSelectedStatuses();
+
+    // filter features for timeline only
+    const filtered = features.filter(f => {
+      const p = f.properties || {};
+      const st = String(p.status || '').toLowerCase();
+      // if no checkbox selected => show nothing (intentional)
+      return selectedStatuses.has(st);
+    });
+
+    if (countEl) countEl.textContent = `${filtered.length} shown`;
 
     // group by period_month
     const groups = new Map();
-    for (const f of features) {
+    for (const f of filtered) {
       const p = f.properties || {};
       const m = p.period_month || 'n/a';
       if (!groups.has(m)) groups.set(m, []);
       groups.get(m).push(f);
     }
 
-    // sort months desc (YYYY-MM lexicographic sort works)
+    // sort months desc (YYYY-MM)
     const months = [...groups.keys()].sort().reverse();
 
     let html = '';
@@ -288,19 +395,98 @@
       }
     }
 
+    el.innerHTML = html || `<div style="padding:12px; color:#666;">No data for the selected statuses</div>`;
+  }
+
+  /* =========================
+     Data quality render (last org update)
+     ========================= */
+  function renderOrgQuality(features) {
+    const el = document.getElementById('org-quality');
+    if (!el) return;
+
+    // Aggregate max(last_update) per org
+    const byOrg = new Map();
+
+    for (const f of features) {
+      const p = f.properties || {};
+      const org = p.org_name || 'Unknown';
+
+      const d = parseDateLoose(p.last_update); // Date or null
+      if (!byOrg.has(org)) {
+        byOrg.set(org, { org, latestDate: null, latestRaw: null, count: 0 });
+      }
+      const row = byOrg.get(org);
+      row.count++;
+
+      if (d && (!row.latestDate || d > row.latestDate)) {
+        row.latestDate = d;
+        row.latestRaw = p.last_update;
+      }
+    }
+
+    const rows = [...byOrg.values()];
+
+    // Sort: worst (oldest) first, then name
+    rows.sort((a, b) => {
+      const fa = orgFreshnessFromLastUpdate(a.latestRaw);
+      const fb = orgFreshnessFromLastUpdate(b.latestRaw);
+
+      const da = (fa.days == null) ? 999999 : fa.days;
+      const db = (fb.days == null) ? 999999 : fb.days;
+      if (db !== da) return db - da; // bigger days first
+      return a.org.localeCompare(b.org);
+    });
+
+    let html = `
+      <div style="display:flex; padding:10px 12px; font-weight:900; background:#f7f7f7; border-bottom:1px solid #eee;">
+        <div style="flex:1; min-width:0;">Organisation</div>
+        <div style="width:110px; text-align:right;">Last update</div>
+      </div>
+    `;
+
+    for (const r of rows) {
+      const fr = orgFreshnessFromLastUpdate(r.latestRaw);
+      const dot = `<span title="${escapeHtml(fr.title)}" style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${fr.color};margin-right:8px;vertical-align:middle;"></span>`;
+      const dateLabel = r.latestRaw ? escapeHtml(String(r.latestRaw)) : 'n/a';
+
+      html += `
+        <div style="display:flex; align-items:center; padding:10px 12px; border-bottom:1px solid #f0f0f0;">
+          <div style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+            ${dot}${escapeHtml(r.org)}
+            <span style="color:#888; font-weight:600; margin-left:6px;">(${r.count})</span>
+          </div>
+          <div style="width:110px; text-align:right; font-weight:800; color:#333;">
+            ${dateLabel}
+          </div>
+        </div>
+      `;
+    }
+
     el.innerHTML = html || `<div style="padding:12px; color:#666;">No data</div>`;
   }
 
   /* =========================
-     Load interventions and render timeline
+     Load interventions once
      ========================= */
   fetch(INTERVENTIONS_URL)
     .then(r => r.json())
-    .then(fc => renderTimeline(fc.features || []))
+    .then(fc => {
+      allFeatures = fc.features || [];
+      renderTimeline(allFeatures);
+      renderOrgQuality(allFeatures);
+
+      // Hook status checkbox changes
+      document.querySelectorAll('.status-filter').forEach(cb => {
+        cb.addEventListener('change', () => renderTimeline(allFeatures));
+      });
+    })
     .catch(err => {
       console.error('Interventions load error:', err);
-      const el = document.getElementById('timeline');
-      if (el) el.innerHTML = `<div style="padding:12px;color:#b00;">Failed to load interventions</div>`;
+      const t = document.getElementById('timeline');
+      if (t) t.innerHTML = `<div style="padding:12px;color:#b00;">Failed to load interventions</div>`;
+      const q = document.getElementById('org-quality');
+      if (q) q.innerHTML = `<div style="padding:12px;color:#b00;">Failed to load interventions</div>`;
     });
 
   /* =========================
