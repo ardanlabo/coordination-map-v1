@@ -90,7 +90,7 @@
 
     /* Timeline container */
     #timeline{
-      max-height: 520px;
+      max-height: 360px;
       overflow:auto;
       border:1px solid #eee;
       border-radius:10px;
@@ -158,13 +158,118 @@
       font-weight:800;
       white-space:nowrap;
     }
+
+    /* Woreda table */
+    #woreda-wrap{
+      margin-top:14px;
+    }
+    .w-controls{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      margin:8px 0 10px 0;
+    }
+    .w-controls label{
+      font-weight:800;
+      font-size:13px;
+      color:#333;
+    }
+    .w-controls select{
+      padding:6px 8px;
+      border-radius:8px;
+      border:1px solid #ddd;
+      background:#fff;
+      font-weight:700;
+      font-size:13px;
+    }
+    #woreda-table{
+      border:1px solid #eee;
+      border-radius:10px;
+      overflow:auto;
+      max-height: 360px;
+      background:#fff;
+    }
+    .w-head{
+      display:flex;
+      padding:10px 12px;
+      font-weight:900;
+      background:#f7f7f7;
+      border-bottom:1px solid #eee;
+      position:sticky;
+      top:0;
+      z-index:1;
+    }
+    .w-col-woreda{ flex:1; min-width:160px; }
+    .w-col-count{ width:110px; text-align:right; }
+    .w-row{
+      border-bottom:1px solid #f0f0f0;
+    }
+    details.w-details summary{
+      list-style:none;
+      cursor:pointer;
+      padding:10px 12px;
+      display:flex;
+      align-items:center;
+      gap:10px;
+    }
+    details.w-details summary::-webkit-details-marker { display:none; }
+    .w-name{ flex:1; font-weight:900; }
+    .w-meta{ width:110px; text-align:right; font-weight:900; color:#333; }
+    .w-submeta{
+      padding:0 12px 10px 12px;
+      color:#666;
+      font-size:12px;
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+    }
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      background:#fafafa;
+      border:1px solid #eee;
+      border-radius:999px;
+      padding:2px 8px;
+      white-space:nowrap;
+    }
+    .w-items{
+      padding:0 12px 12px 12px;
+    }
+    .w-item{
+      padding:10px 0;
+      border-top:1px dashed #eee;
+      font-size:13px;
+    }
+    .w-item-top{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:10px;
+    }
+    .w-item-org{
+      font-weight:900;
+      min-width:0;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+    }
+    .w-item-sub{
+      color:#666;
+      margin-top:3px;
+      font-size:12px;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+    }
   </style>
 </head>
 <body>
 
 <div id="app">
   <div id="header">
-    <h1>Coordination Dashboard — Benishangul-Gumuz</h1>
+    <h1>Coordination Dashboard — Benishangul-Gumuz (Nutrition)</h1>
     <div class="actions">
       <button class="btn" id="btn-open-map" type="button">Open full map</button>
       <button class="btn" id="btn-update" type="button" title="Coming soon">Update data (coming soon)</button>
@@ -173,14 +278,14 @@
 
   <div id="content">
     <div class="grid">
-      <!-- LEFT: Timeline -->
+      <!-- LEFT: Timeline + Woreda -->
       <div class="card">
         <h2>Timeline (by month)</h2>
         <div class="muted">
-          Scrollable list grouped by <code>period_month</code> (latest first). Filters apply only to this timeline.
+          Scrollable list grouped by <code>period_month</code> (latest first). Status filters apply only to this timeline.
         </div>
 
-        <!-- NEW: Status tick-box filters -->
+        <!-- Status tick-box filters (timeline only) -->
         <div class="filter-row" aria-label="Status filters">
           <label class="filter-chip" title="Show completed">
             <input type="checkbox" class="status-filter" value="completed" checked />
@@ -204,6 +309,32 @@
         </div>
 
         <div id="timeline"></div>
+
+        <!-- Woreda coverage (Nutrition) -->
+        <div id="woreda-wrap">
+          <h2 style="margin:14px 0 6px 0;">Woreda coverage (Nutrition)</h2>
+          <div class="muted">
+            Spatial view for the Nutrition cluster: by woreda → actors, sites, last update. Month filter applies to this table only.
+          </div>
+
+          <div class="w-controls">
+            <div style="display:flex; align-items:center; gap:10px;">
+              <label for="woreda-month">Month</label>
+              <select id="woreda-month">
+                <option value="">All</option>
+              </select>
+            </div>
+            <div id="woreda-count" class="muted" style="font-weight:900;">0 woredas</div>
+          </div>
+
+          <div id="woreda-table">
+            <div class="w-head">
+              <div class="w-col-woreda">Woreda</div>
+              <div class="w-col-count"># interventions</div>
+            </div>
+            <div id="woreda-body"></div>
+          </div>
+        </div>
       </div>
 
       <!-- RIGHT: Data quality -->
@@ -245,7 +376,6 @@
   const ETH_ADM1_URL = url('data/eth_admin1.geojson');
   const INTERVENTIONS_URL = url('data/interventions_benishangul_mock.geojson');
 
-  // Hold data once loaded
   let allFeatures = [];
 
   /* =========================
@@ -276,14 +406,12 @@
   function parseDateLoose(v) {
     if (!v) return null;
     const s = String(v).trim();
-    // YYYY-MM-DD or YYYY/MM/DD
     const m = s.match(/^(\d{4})[-\/](\d{2})[-\/](\d{2})/);
     if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
     const d = new Date(s);
     return isNaN(d) ? null : d;
   }
 
-  // For TIMELINE dot (green/orange/red) — you already use this logic on the map
   function freshnessFromLastUpdate(lastUpdate) {
     const d = parseDateLoose(lastUpdate);
     if (!d) return { color:'#bdbdbd', title:'No last_update', days:null };
@@ -294,17 +422,14 @@
     return { color:'#d62728', title:`${days} day(s) old`, days };
   }
 
-  // For ORG table dot (green/orange/BLACK), per your requirement
   function orgFreshnessFromLastUpdate(lastUpdate) {
     const d = parseDateLoose(lastUpdate);
     if (!d) return { color:'#bdbdbd', title:'No last_update', days:null, dateStr:'n/a' };
-
     const days = Math.floor((new Date() - d) / (1000*60*60*24));
     if (!isFinite(days) || days < 0) return { color:'#bdbdbd', title:'Invalid last_update', days:null, dateStr:'n/a' };
-
     if (days <= 7)  return { color:'#2ca02c', title:`${days} day(s) old`, days, dateStr: String(lastUpdate) };
     if (days <= 21) return { color:'#ff7f0e', title:`${days} day(s) old`, days, dateStr: String(lastUpdate) };
-    return { color:'#000000', title:`${days} day(s) old`, days, dateStr: String(lastUpdate) }; // noir
+    return { color:'#000000', title:`${days} day(s) old`, days, dateStr: String(lastUpdate) }; // black
   }
 
   function statusColor(status) {
@@ -323,8 +448,13 @@
     return selected;
   }
 
+  function isNutrition(p) {
+    // Nutrition-only tool: filter by cluster == "Nutrition" (case-insensitive)
+    return String(p.cluster || '').toLowerCase() === 'nutrition';
+  }
+
   /* =========================
-     Timeline render (with status filters)
+     Timeline render (status filters)
      ========================= */
   function renderTimeline(features) {
     const el = document.getElementById('timeline');
@@ -333,17 +463,14 @@
 
     const selectedStatuses = getSelectedStatuses();
 
-    // filter features for timeline only
     const filtered = features.filter(f => {
       const p = f.properties || {};
       const st = String(p.status || '').toLowerCase();
-      // if no checkbox selected => show nothing (intentional)
       return selectedStatuses.has(st);
     });
 
     if (countEl) countEl.textContent = `${filtered.length} shown`;
 
-    // group by period_month
     const groups = new Map();
     for (const f of filtered) {
       const p = f.properties || {};
@@ -352,14 +479,12 @@
       groups.get(m).push(f);
     }
 
-    // sort months desc (YYYY-MM)
     const months = [...groups.keys()].sort().reverse();
 
     let html = '';
     for (const month of months) {
       const items = groups.get(month);
 
-      // sort inside month: org then woreda then site
       items.sort((a, b) => {
         const pa = a.properties || {}, pb = b.properties || {};
         const oa = String(pa.org_name || ''), ob = String(pb.org_name || '');
@@ -405,17 +530,15 @@
     const el = document.getElementById('org-quality');
     if (!el) return;
 
-    // Aggregate max(last_update) per org
     const byOrg = new Map();
 
     for (const f of features) {
       const p = f.properties || {};
       const org = p.org_name || 'Unknown';
 
-      const d = parseDateLoose(p.last_update); // Date or null
-      if (!byOrg.has(org)) {
-        byOrg.set(org, { org, latestDate: null, latestRaw: null, count: 0 });
-      }
+      const d = parseDateLoose(p.last_update);
+      if (!byOrg.has(org)) byOrg.set(org, { org, latestDate: null, latestRaw: null, count: 0 });
+
       const row = byOrg.get(org);
       row.count++;
 
@@ -427,14 +550,12 @@
 
     const rows = [...byOrg.values()];
 
-    // Sort: worst (oldest) first, then name
     rows.sort((a, b) => {
       const fa = orgFreshnessFromLastUpdate(a.latestRaw);
       const fb = orgFreshnessFromLastUpdate(b.latestRaw);
-
       const da = (fa.days == null) ? 999999 : fa.days;
       const db = (fb.days == null) ? 999999 : fb.days;
-      if (db !== da) return db - da; // bigger days first
+      if (db !== da) return db - da;
       return a.org.localeCompare(b.org);
     });
 
@@ -467,18 +588,164 @@
   }
 
   /* =========================
+     Woreda coverage (Nutrition) with MONTH filter (local)
+     ========================= */
+  function getWoredaMonthSelection() {
+    const sel = document.getElementById('woreda-month');
+    return sel ? sel.value : '';
+  }
+
+  function populateWoredaMonths(features) {
+    const sel = document.getElementById('woreda-month');
+    if (!sel) return;
+
+    // Nutrition-only months
+    const months = [...new Set(features
+      .map(f => f.properties || {})
+      .filter(p => isNutrition(p))
+      .map(p => p.period_month)
+      .filter(Boolean)
+    )].sort().reverse();
+
+    // keep current selection if possible
+    const current = sel.value;
+
+    sel.innerHTML = `<option value="">All</option>` + months.map(m => `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`).join('');
+
+    if (months.includes(current)) sel.value = current;
+  }
+
+  function renderWoredaCoverage(features) {
+    const body = document.getElementById('woreda-body');
+    const countEl = document.getElementById('woreda-count');
+    if (!body) return;
+
+    const selectedStatuses = getSelectedStatuses(); // reuse status logic
+    const monthFilter = getWoredaMonthSelection();  // LOCAL month filter for woreda table
+
+    // Filter: Nutrition only + status selected + month (if set)
+    const filtered = features.filter(f => {
+      const p = f.properties || {};
+      if (!isNutrition(p)) return false;
+      const st = String(p.status || '').toLowerCase();
+      if (!selectedStatuses.has(st)) return false;
+      if (monthFilter && p.period_month !== monthFilter) return false;
+      return true;
+    });
+
+    // Group by woreda
+    const byWoreda = new Map();
+    for (const f of filtered) {
+      const p = f.properties || {};
+      const w = p.woreda || 'Unknown';
+      if (!byWoreda.has(w)) byWoreda.set(w, { woreda: w, items: [], orgs: new Set(), types: new Map() });
+      const row = byWoreda.get(w);
+
+      row.items.push(f);
+      row.orgs.add(p.org_name || 'Unknown');
+
+      const t = p.intervention_type || 'Unknown type';
+      row.types.set(t, (row.types.get(t) || 0) + 1);
+    }
+
+    // Sort woredas by # interventions desc
+    const rows = [...byWoreda.values()].sort((a,b) => b.items.length - a.items.length || a.woreda.localeCompare(b.woreda));
+
+    if (countEl) countEl.textContent = `${rows.length} woredas`;
+
+    // Render
+    let html = '';
+    for (const r of rows) {
+      // top 3 types summary
+      const typesArr = [...r.types.entries()].sort((a,b) => b[1]-a[1]).slice(0, 3);
+      const typesLabel = typesArr.length
+        ? typesArr.map(([k,v]) => `${k}(${v})`).join(', ')
+        : 'n/a';
+
+      // items sorted for readability
+      r.items.sort((a,b) => {
+        const pa = a.properties || {}, pb = b.properties || {};
+        const oa = String(pa.org_name || ''), ob = String(pb.org_name || '');
+        if (oa !== ob) return oa.localeCompare(ob);
+        const sa = String(pa.site_name || ''), sb = String(pb.site_name || '');
+        return sa.localeCompare(sb);
+      });
+
+      const safeW = escapeHtml(r.woreda);
+
+      html += `
+        <div class="w-row">
+          <details class="w-details">
+            <summary>
+              <div class="w-name">${safeW}</div>
+              <div class="w-meta">${r.items.length}</div>
+            </summary>
+
+            <div class="w-submeta">
+              <span class="pill"><b>Orgs:</b> ${r.orgs.size}</span>
+              <span class="pill"><b>Top types:</b> ${escapeHtml(typesLabel)}</span>
+            </div>
+
+            <div class="w-items">
+              ${r.items.map(ff => {
+                const p = ff.properties || {};
+                const org = p.org_name || 'Unknown';
+                const site = p.site_name || '-';
+                const st = p.status || '-';
+                const pm = p.period_month || '-';
+                const typ = p.intervention_type || '-';
+
+                const fr = freshnessFromLastUpdate(p.last_update);
+                const dot = `<span title="${escapeHtml(fr.title)}" style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${fr.color};margin-left:6px;vertical-align:middle;"></span>`;
+                const badge = `<span style="display:inline-block;padding:2px 8px;border-radius:999px;color:#fff;font-size:12px;line-height:18px;background:${statusColor(st)};white-space:nowrap;">${escapeHtml(String(st).toLowerCase())}</span>`;
+
+                return `
+                  <div class="w-item">
+                    <div class="w-item-top">
+                      <div class="w-item-org">${escapeHtml(org)} ${dot}</div>
+                      ${badge}
+                    </div>
+                    <div class="w-item-sub"><b>Site:</b> ${escapeHtml(site)} | <b>Month:</b> ${escapeHtml(pm)}</div>
+                    <div class="w-item-sub"><b>Type:</b> ${escapeHtml(typ)} | <b>Last update:</b> ${escapeHtml(p.last_update || 'n/a')}</div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </details>
+        </div>
+      `;
+    }
+
+    body.innerHTML = html || `<div style="padding:12px; color:#666;">No Nutrition activities for selected filters</div>`;
+  }
+
+  /* =========================
      Load interventions once
      ========================= */
   fetch(INTERVENTIONS_URL)
     .then(r => r.json())
     .then(fc => {
       allFeatures = fc.features || [];
+
+      // Timeline + org quality
       renderTimeline(allFeatures);
       renderOrgQuality(allFeatures);
 
-      // Hook status checkbox changes
+      // Woreda months dropdown (Nutrition months)
+      populateWoredaMonths(allFeatures);
+      renderWoredaCoverage(allFeatures);
+
+      // Hook status checkbox changes => timeline + woreda table (same status logic)
       document.querySelectorAll('.status-filter').forEach(cb => {
-        cb.addEventListener('change', () => renderTimeline(allFeatures));
+        cb.addEventListener('change', () => {
+          renderTimeline(allFeatures);
+          renderWoredaCoverage(allFeatures);
+        });
+      });
+
+      // Hook woreda month filter (local)
+      document.getElementById('woreda-month').addEventListener('change', () => {
+        renderWoredaCoverage(allFeatures);
       });
     })
     .catch(err => {
@@ -487,6 +754,8 @@
       if (t) t.innerHTML = `<div style="padding:12px;color:#b00;">Failed to load interventions</div>`;
       const q = document.getElementById('org-quality');
       if (q) q.innerHTML = `<div style="padding:12px;color:#b00;">Failed to load interventions</div>`;
+      const wb = document.getElementById('woreda-body');
+      if (wb) wb.innerHTML = `<div style="padding:12px;color:#b00;">Failed to load interventions</div>`;
     });
 
   /* =========================
