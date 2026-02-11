@@ -37,12 +37,40 @@
       align-items:baseline;
       justify-content:space-between;
       gap:10px;
+      flex-wrap:wrap;
     }
     .sidebar-title{ font-weight:800; }
     .sidebar-count{ color:#666; }
+
+    /* NEW: KPI block */
+    #sidebar-kpi{
+      width:100%;
+      margin-top:6px;
+      font-size:12px;
+      color:#555;
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+    }
+    .kpi-chip{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      background:#f6f6f6;
+      border:1px solid #eee;
+      border-radius:999px;
+      padding:2px 8px;
+      line-height:18px;
+      white-space:nowrap;
+    }
+    .kpi-dot{
+      width:8px;height:8px;border-radius:50%;
+      display:inline-block;
+    }
+
     .sidebar-list{
       overflow:auto;
-      max-height: calc(100% - 44px);
+      max-height: calc(100% - 74px);
     }
     .item{
       padding:10px;
@@ -55,6 +83,7 @@
       justify-content:space-between;
       gap:10px;
       margin-bottom:4px;
+      align-items:center;
     }
     .badge{
       padding:2px 8px;
@@ -77,12 +106,34 @@
       padding: 10px;
       border-radius: 6px;
       box-shadow: 0 0 6px rgba(0,0,0,0.3);
-      width: 220px;
+      width: 240px;
       font-size: 13px;
     }
     #controls h4 { margin: 6px 0; }
     #controls label { display: block; margin-top: 6px; font-weight: 600; }
     #controls select { width: 100%; }
+
+    /* NEW: checkbox + button styles */
+    .controls-row{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      margin-top:10px;
+      user-select:none;
+    }
+    .controls-row input[type="checkbox"]{ transform: translateY(1px); }
+    .btn{
+      width:100%;
+      margin-top:10px;
+      padding:8px 10px;
+      border:1px solid #ddd;
+      background:#fafafa;
+      border-radius:6px;
+      cursor:pointer;
+      font-weight:600;
+    }
+    .btn:hover{ background:#f2f2f2; }
+    .btn:disabled{ opacity:0.55; cursor:not-allowed; }
 
     /* Legend */
     .legend-row { display: flex; align-items: center; margin: 4px 0; }
@@ -116,6 +167,9 @@
   <div class="sidebar-header">
     <div class="sidebar-title">Interventions</div>
     <div id="sidebar-count" class="sidebar-count">0 shown</div>
+
+    <!-- NEW: KPI line -->
+    <div id="sidebar-kpi"></div>
   </div>
   <div id="sidebar-list" class="sidebar-list"></div>
 </div>
@@ -142,6 +196,17 @@
   <select id="filter-month">
     <option value="">All</option>
   </select>
+
+  <!-- NEW: Outdated only -->
+  <div class="controls-row">
+    <input type="checkbox" id="filter-outdated" />
+    <label for="filter-outdated" style="display:inline; margin:0; font-weight:600;">
+      Outdated only (&gt;21 days)
+    </label>
+  </div>
+
+  <!-- NEW: Export -->
+  <button class="btn" id="btn-export" type="button">Export CSV (current list)</button>
 </div>
 
 <!-- Leaflet JS -->
@@ -216,6 +281,96 @@
   }
 
   /* =========================
+     NEW: Freshness helpers (used by KPI + sidebar + outdated filter)
+     ========================= */
+  function parseDateLoose(v) {
+    if (!v) return null;
+    if (v instanceof Date && !isNaN(v)) return v;
+    if (typeof v === 'number') {
+      const d = new Date(v);
+      return isNaN(d) ? null : d;
+    }
+    const s = String(v).trim();
+    if (!s) return null;
+
+    // If format is YYYY-MM-DD or YYYY/MM/DD -> local midnight
+    const m = s.match(/^(\d{4})[-\/](\d{2})[-\/](\d{2})/);
+    if (m) {
+      const y = Number(m[1]), mo = Number(m[2]) - 1, d0 = Number(m[3]);
+      const d = new Date(y, mo, d0);
+      return isNaN(d) ? null : d;
+    }
+
+    const d = new Date(s);
+    return isNaN(d) ? null : d;
+  }
+
+  function freshnessFromLastUpdate(lastUpdate) {
+    const d = parseDateLoose(lastUpdate);
+    if (!d) return { band: 'na', color: '#bdbdbd', title: 'No last_update', days: null }; // grey
+    const now = new Date();
+    const diffMs = now - d;
+    const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    if (!isFinite(days) || days < 0) return { band: 'na', color: '#bdbdbd', title: 'Invalid last_update', days: null };
+    if (days <= 7)  return { band: 'green',  color: '#2ca02c', title: `${days} day(s) old`, days };
+    if (days <= 21) return { band: 'orange', color: '#ff7f0e', title: `${days} day(s) old`, days };
+    return { band: 'red', color: '#d62728', title: `${days} day(s) old`, days };
+  }
+
+  function freshnessRank(band) {
+    // higher = shown first in sidebar
+    if (band === 'red') return 3;
+    if (band === 'orange') return 2;
+    if (band === 'green') return 1;
+    return 0; // na
+  }
+
+  function updateKpi(features) {
+    let upToDate = 0, outdated = 0, noDate = 0;
+
+    for (const f of features) {
+      const p = f.properties || {};
+      const fr = freshnessFromLastUpdate(p.last_update);
+      if (fr.band === 'na') noDate++;
+      else if (fr.band === 'red') outdated++;
+      else upToDate++; // green + orange
+    }
+
+    const el = document.getElementById('sidebar-kpi');
+    el.innerHTML = `
+      <span class="kpi-chip" title="Updated within 21 days">
+        <span class="kpi-dot" style="background:#2ca02c"></span>
+        Up-to-date: <b>${upToDate}</b>
+      </span>
+      <span class="kpi-chip" title="Older than 21 days">
+        <span class="kpi-dot" style="background:#d62728"></span>
+        Outdated: <b>${outdated}</b>
+      </span>
+      <span class="kpi-chip" title="Missing or invalid last_update">
+        <span class="kpi-dot" style="background:#bdbdbd"></span>
+        No date: <b>${noDate}</b>
+      </span>
+    `;
+  }
+
+  function downloadCsv(filename, rows) {
+    const escapeCsv = (v) => {
+      const s = String(v ?? '');
+      if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+      return s;
+    };
+    const csv = rows.map(r => r.map(escapeCsv).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(a.href);
+  }
+
+  /* =========================
      ADM0 – Ethiopia
      ========================= */
   fetch(ETH_ADM0_URL).then(r=>r.json()).then(fc=>{
@@ -281,125 +436,119 @@
   });
   map.addLayer(clusterGroup);
 
-function renderSidebar(features, markersIndex) {
-  const list = document.getElementById('sidebar-list');
-  const count = document.getElementById('sidebar-count');
-  list.innerHTML = '';
-  count.textContent = `${features.length} shown`;
+  // NEW: keep what is currently shown (for export)
+  let currentDisplayedFeatures = [];
 
-  // --- Freshness helpers (sidebar only; based on last_update) ---
-  function parseDateLoose(v) {
-    if (!v) return null;
-    // Accept Date, timestamp, ISO, or common "YYYY-MM-DD" / "YYYY/MM/DD"
-    if (v instanceof Date && !isNaN(v)) return v;
-    if (typeof v === 'number') {
-      const d = new Date(v);
-      return isNaN(d) ? null : d;
-    }
-    const s = String(v).trim();
-    if (!s) return null;
+  function renderSidebar(features, markersIndex) {
+    const list = document.getElementById('sidebar-list');
+    const count = document.getElementById('sidebar-count');
+    list.innerHTML = '';
+    count.textContent = `${features.length} shown`;
 
-    // If format is YYYY-MM-DD or YYYY/MM/DD -> force local midnight
-    const m = s.match(/^(\d{4})[-\/](\d{2})[-\/](\d{2})/);
-    if (m) {
-      const y = Number(m[1]), mo = Number(m[2]) - 1, d0 = Number(m[3]);
-      const d = new Date(y, mo, d0);
-      return isNaN(d) ? null : d;
-    }
+    // NEW: sort by freshness (red -> orange -> green -> na), then by days desc
+    const sorted = [...features].sort((a, b) => {
+      const pa = a.properties || {};
+      const pb = b.properties || {};
+      const fa = freshnessFromLastUpdate(pa.last_update);
+      const fb = freshnessFromLastUpdate(pb.last_update);
 
-    // Fallback to Date parsing (ISO strings etc.)
-    const d = new Date(s);
-    return isNaN(d) ? null : d;
-  }
+      const ra = freshnessRank(fa.band);
+      const rb = freshnessRank(fb.band);
+      if (rb !== ra) return rb - ra; // higher rank first
 
-  function freshnessFromLastUpdate(lastUpdate) {
-    const d = parseDateLoose(lastUpdate);
-    if (!d) {
-      return { color: '#bdbdbd', title: 'No last_update' }; // grey
-    }
-    const now = new Date();
-    const diffMs = now - d;
-    const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-    if (!isFinite(days) || days < 0) {
-      return { color: '#bdbdbd', title: 'Invalid last_update' }; // grey
-    }
-    if (days <= 7)  return { color: '#2ca02c', title: `${days} day(s) old` }; // green
-    if (days <= 21) return { color: '#ff7f0e', title: `${days} day(s) old` }; // orange
-    return { color: '#d62728', title: `${days} day(s) old` }; // red
-  }
-  // -------------------------------------------------------------
-
-  for (const f of features) {
-    const p = f.properties || {};
-    const id = String(p.record_id || p.id || `${p.org_name}-${p.site_name}-${p.period_month}`);
-    const status = String(p.status || '').toLowerCase();
-    const color = statusColor(status);
-
-    const org = p.org_name || 'Unknown';
-    const woreda = p.woreda || '-';
-    const site = p.site_name || '-';
-    const month = p.period_month || '-';
-
-    // NEW: compute freshness dot (sidebar only)
-    const fresh = freshnessFromLastUpdate(p.last_update);
-    const freshnessDot = `
-      <span
-        class="fresh-dot"
-        title="${escapeHtml(fresh.title)}"
-        style="
-          display:inline-block;
-          width:10px;height:10px;
-          border-radius:50%;
-          background:${fresh.color};
-          margin-left:8px;
-          vertical-align:middle;
-          flex:0 0 auto;
-        ">
-      </span>
-    `;
-
-    const row = document.createElement('div');
-    row.className = 'item';
-    row.dataset.id = id;
-
-    row.innerHTML = `
-      <div class="item-top">
-        <div class="item-main" style="display:flex;align-items:center;min-width:0;">
-          <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(org)}</span>
-          ${freshnessDot}
-        </div>
-        <div class="badge" style="background:${color}">${escapeHtml(status || '-')}</div>
-      </div>
-      <div class="item-sub">${escapeHtml(woreda)} — ${escapeHtml(site)}</div>
-      <div class="item-sub">${escapeHtml(month)}</div>
-    `;
-
-    row.addEventListener('click', () => {
-      const m = markersIndex.get(id);
-      if (!m) return;
-      map.setView(m.getLatLng(), Math.max(map.getZoom(), 11), { animate: true });
-      m.openPopup();
+      const da = (fa.days == null) ? -1 : fa.days;
+      const db = (fb.days == null) ? -1 : fb.days;
+      return db - da; // older first
     });
 
-    list.appendChild(row);
-  }
-}
+    for (const f of sorted) {
+      const p = f.properties || {};
+      const id = String(p.record_id || p.id || `${p.org_name}-${p.site_name}-${p.period_month}`);
+      const status = String(p.status || '').toLowerCase();
+      const color = statusColor(status);
 
+      const org = p.org_name || 'Unknown';
+      const woreda = p.woreda || '-';
+      const site = p.site_name || '-';
+      const month = p.period_month || '-';
+
+      // Freshness dot (sidebar only)
+      const fr = freshnessFromLastUpdate(p.last_update);
+      const freshnessDot = `
+        <span
+          class="fresh-dot"
+          title="${escapeHtml(fr.title)} (last_update: ${escapeHtml(p.last_update || 'n/a')})"
+          style="
+            display:inline-block;
+            width:10px;height:10px;
+            border-radius:50%;
+            background:${fr.color};
+            margin-left:8px;
+            vertical-align:middle;
+          ">
+        </span>
+      `;
+
+      const row = document.createElement('div');
+      row.className = 'item';
+      row.dataset.id = id;
+
+      row.innerHTML = `
+        <div class="item-top">
+          <div class="item-main">
+            ${escapeHtml(org)} ${freshnessDot}
+          </div>
+          <div class="badge" style="background:${color}">${escapeHtml(status || '-')}</div>
+        </div>
+        <div class="item-sub">${escapeHtml(woreda)} — ${escapeHtml(site)}</div>
+        <div class="item-sub">${escapeHtml(month)}</div>
+      `;
+
+      row.addEventListener('click', () => {
+        const m = markersIndex.get(id);
+        if (!m) return;
+        map.setView(m.getLatLng(), Math.max(map.getZoom(), 11), { animate: true });
+        m.openPopup();
+      });
+
+      list.appendChild(row);
+    }
+  }
 
   function applyFilters() {
     const org = document.getElementById('filter-org').value;
     const status = document.getElementById('filter-status').value;
     const month = document.getElementById('filter-month').value;
+    const outdatedOnly = document.getElementById('filter-outdated').checked;
 
     clusterGroup.clearLayers();
 
-    const filtered = interventionsData.features.filter(f => {
+    // Base filtering (existing logic preserved)
+    const baseFiltered = interventionsData.features.filter(f => {
       const p = f.properties || {};
       if (org && p.org_name !== org) return false;
       if (status && String(p.status).toLowerCase() !== status) return false;
       if (month && p.period_month !== month) return false;
       return true;
     });
+
+    // NEW: KPI computed on base filters (before outdatedOnly toggle)
+    updateKpi(baseFiltered);
+
+    // NEW: Outdated-only filter (>21 days based solely on last_update)
+    const filtered = outdatedOnly
+      ? baseFiltered.filter(f => {
+          const p = f.properties || {};
+          const fr = freshnessFromLastUpdate(p.last_update);
+          return fr.band === 'red';
+        })
+      : baseFiltered;
+
+    // Keep current list for export
+    currentDisplayedFeatures = filtered;
+
+    // Enable/disable export button
+    document.getElementById('btn-export').disabled = (filtered.length === 0);
 
     const markersIndex = new Map();
 
@@ -422,6 +571,33 @@ function renderSidebar(features, markersIndex) {
     clusterGroup.addLayer(layer);
     renderSidebar(filtered, markersIndex);
   }
+
+  // NEW: export handler
+  document.getElementById('btn-export').addEventListener('click', () => {
+    const rows = [];
+    rows.push([
+      'org_name','cluster','zone','woreda','site_name','status','period_month','last_update','days_old'
+    ]);
+
+    for (const f of currentDisplayedFeatures) {
+      const p = f.properties || {};
+      const fr = freshnessFromLastUpdate(p.last_update);
+      rows.push([
+        p.org_name || '',
+        p.cluster || '',
+        p.zone || '',
+        p.woreda || '',
+        p.site_name || '',
+        p.status || '',
+        p.period_month || '',
+        p.last_update || '',
+        (fr.days == null ? '' : fr.days)
+      ]);
+    }
+
+    const ts = new Date().toISOString().slice(0, 10);
+    downloadCsv(`interventions_export_${ts}.csv`, rows);
+  });
 
   fetch(INTERVENTIONS_URL)
     .then(r => r.json())
@@ -447,8 +623,11 @@ function renderSidebar(features, markersIndex) {
         monthSel.appendChild(opt);
       });
 
-      ['filter-org','filter-status','filter-month']
+      ['filter-org','filter-status','filter-month','filter-outdated']
         .forEach(id => document.getElementById(id).addEventListener('change', applyFilters));
+
+      // initial state: export disabled until data rendered
+      document.getElementById('btn-export').disabled = true;
 
       applyFilters();
     })
