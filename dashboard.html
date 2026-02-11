@@ -71,7 +71,7 @@
       z-index:11;
     }
 
-    /* Placeholder panels */
+    /* Layout cards */
     .grid{
       display:grid;
       grid-template-columns: 1.2fr 0.8fr;
@@ -87,6 +87,45 @@
     }
     .card h2{ margin:0 0 10px 0; font-size:14px; font-weight:900; }
     .muted{ color:#666; font-size:13px; line-height:1.4; }
+
+    /* Timeline container */
+    #timeline{
+      max-height: 520px;
+      overflow:auto;
+      border:1px solid #eee;
+      border-radius:10px;
+      background:#fff;
+    }
+    .month-header{
+      padding:10px 12px;
+      background:#f7f7f7;
+      border-bottom:1px solid #eee;
+      font-weight:900;
+    }
+    .t-item{
+      padding:10px 12px;
+      border-bottom:1px solid #f0f0f0;
+    }
+    .t-top{
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+      align-items:center;
+    }
+    .t-org{
+      font-weight:800;
+      min-width:0;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+    }
+    .t-sub{
+      color:#666;
+      margin-top:2px;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+    }
   </style>
 </head>
 <body>
@@ -103,15 +142,17 @@
   <div id="content">
     <div class="grid">
       <div class="card">
-        <h2>Coordination tools (placeholder)</h2>
-        <div class="muted">
-          Next step: add a scrollable timeline sorted by period_month (monthly).
+        <h2>Timeline (by month)</h2>
+        <div class="muted" style="margin-bottom:10px;">
+          Scrollable list of activities grouped by <code>period_month</code> (latest first).
         </div>
+        <div id="timeline"></div>
       </div>
+
       <div class="card">
         <h2>Data quality (placeholder)</h2>
         <div class="muted">
-          Next step: add freshness KPIs and charts.
+          Next step: add freshness KPIs and charts here.
         </div>
       </div>
     </div>
@@ -127,14 +168,20 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
-  // GitHub Pages safe base path
+  /* =========================
+     BASE PATH (GitHub Pages safe)
+     ========================= */
   const BASE = window.location.pathname.endsWith('/')
     ? window.location.pathname
     : window.location.pathname.replace(/\/[^\/]*$/, '/');
   const url = (p) => BASE + p.replace(/^\//, '');
 
   const ETH_ADM1_URL = url('data/eth_admin1.geojson');
+  const INTERVENTIONS_URL = url('data/interventions_benishangul_mock.geojson');
 
+  /* =========================
+     Buttons / navigation
+     ========================= */
   document.getElementById('btn-open-map').addEventListener('click', () => {
     window.location.href = url('index.html');
   });
@@ -145,7 +192,120 @@
     alert("Update workflow not connected yet.\n\nLater: link this to a Google Form/Sheet or an upload flow.");
   });
 
-  // Minimap boundaries-only
+  /* =========================
+     Helpers (timeline)
+     ========================= */
+  function escapeHtml(str) {
+    return String(str ?? '')
+      .replace(/&/g,'&amp;')
+      .replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;')
+      .replace(/'/g,'&#039;');
+  }
+
+  function parseDateLoose(v) {
+    if (!v) return null;
+    const s = String(v).trim();
+    const m = s.match(/^(\d{4})[-\/](\d{2})[-\/](\d{2})/);
+    if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    const d = new Date(s);
+    return isNaN(d) ? null : d;
+  }
+
+  function freshnessFromLastUpdate(lastUpdate) {
+    const d = parseDateLoose(lastUpdate);
+    if (!d) return { color:'#bdbdbd', title:'No last_update', days:null };
+    const days = Math.floor((new Date() - d) / (1000*60*60*24));
+    if (!isFinite(days) || days < 0) return { color:'#bdbdbd', title:'Invalid last_update', days:null };
+    if (days <= 7)  return { color:'#2ca02c', title:`${days} day(s) old`, days };
+    if (days <= 21) return { color:'#ff7f0e', title:`${days} day(s) old`, days };
+    return { color:'#d62728', title:`${days} day(s) old`, days };
+  }
+
+  function statusColor(status) {
+    const s = String(status || '').toLowerCase();
+    if (s === 'planned') return '#808080';
+    if (s === 'ongoing') return '#1f77b4';
+    if (s === 'completed') return '#2ca02c';
+    if (s === 'paused') return '#ff7f0e';
+    return '#000000';
+  }
+
+  function renderTimeline(features) {
+    const el = document.getElementById('timeline');
+    if (!el) return;
+
+    // group by period_month
+    const groups = new Map();
+    for (const f of features) {
+      const p = f.properties || {};
+      const m = p.period_month || 'n/a';
+      if (!groups.has(m)) groups.set(m, []);
+      groups.get(m).push(f);
+    }
+
+    // sort months desc (YYYY-MM lexicographic sort works)
+    const months = [...groups.keys()].sort().reverse();
+
+    let html = '';
+    for (const month of months) {
+      const items = groups.get(month);
+
+      // sort inside month: org then woreda then site
+      items.sort((a, b) => {
+        const pa = a.properties || {}, pb = b.properties || {};
+        const oa = String(pa.org_name || ''), ob = String(pb.org_name || '');
+        if (oa !== ob) return oa.localeCompare(ob);
+        const wa = String(pa.woreda || ''), wb = String(pb.woreda || '');
+        if (wa !== wb) return wa.localeCompare(wb);
+        const sa = String(pa.site_name || ''), sb = String(pb.site_name || '');
+        return sa.localeCompare(sb);
+      });
+
+      html += `<div class="month-header">${escapeHtml(month)}</div>`;
+
+      for (const f of items) {
+        const p = f.properties || {};
+        const org = p.org_name || 'Unknown';
+        const woreda = p.woreda || '-';
+        const site = p.site_name || '-';
+        const status = p.status || '-';
+
+        const fr = freshnessFromLastUpdate(p.last_update);
+        const dot = `<span title="${escapeHtml(fr.title)}" style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${fr.color};margin-left:6px;vertical-align:middle;"></span>`;
+        const badge = `<span style="display:inline-block;padding:2px 8px;border-radius:999px;color:#fff;font-size:12px;line-height:18px;background:${statusColor(status)};white-space:nowrap;">${escapeHtml(String(status).toLowerCase())}</span>`;
+
+        html += `
+          <div class="t-item">
+            <div class="t-top">
+              <div class="t-org">${escapeHtml(org)} ${dot}</div>
+              ${badge}
+            </div>
+            <div class="t-sub">${escapeHtml(woreda)} — ${escapeHtml(site)}</div>
+          </div>
+        `;
+      }
+    }
+
+    el.innerHTML = html || `<div style="padding:12px; color:#666;">No data</div>`;
+  }
+
+  /* =========================
+     Load interventions and render timeline
+     ========================= */
+  fetch(INTERVENTIONS_URL)
+    .then(r => r.json())
+    .then(fc => renderTimeline(fc.features || []))
+    .catch(err => {
+      console.error('Interventions load error:', err);
+      const el = document.getElementById('timeline');
+      if (el) el.innerHTML = `<div style="padding:12px;color:#b00;">Failed to load interventions</div>`;
+    });
+
+  /* =========================
+     MINIMAP (boundaries only)
+     ========================= */
   const mm = L.map('minimap', {
     zoomControl: false,
     attributionControl: false,
