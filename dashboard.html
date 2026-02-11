@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Coordination Dashboard – Benishangul-Gumuz</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- Leaflet CSS (minimap only) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+
+  <style>
+    html, body { margin:0; padding:0; height:100%; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; }
+    #app { position:relative; height:100%; background:#f6f7f9; }
+
+    #header {
+      padding:14px 16px;
+      background:#ffffff;
+      border-bottom:1px solid #e9e9e9;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+    }
+    #header h1 { margin:0; font-size:16px; font-weight:800; }
+    #header .actions { display:flex; gap:8px; align-items:center; }
+
+    .btn {
+      padding:8px 10px;
+      border:1px solid #ddd;
+      background:#fff;
+      border-radius:8px;
+      cursor:pointer;
+      font-weight:700;
+      font-size:13px;
+    }
+    .btn:hover { background:#f3f3f3; }
+
+    #content {
+      height: calc(100% - 54px);
+      padding:16px;
+      box-sizing:border-box;
+    }
+
+    /* Minimap */
+    #minimap-wrap{
+      position:absolute;
+      top:70px;
+      right:16px;
+      width: 20vw;
+      min-width: 260px;
+      max-width: 360px;
+      height: 220px;
+      background:#fff;
+      border-radius:12px;
+      box-shadow:0 6px 18px rgba(0,0,0,0.15);
+      overflow:hidden;
+      z-index:10;
+      cursor:pointer;
+    }
+    #minimap { width:100%; height:100%; }
+    #minimap-badge{
+      position:absolute;
+      left:10px;
+      top:10px;
+      background:rgba(255,255,255,0.92);
+      border:1px solid #e6e6e6;
+      border-radius:999px;
+      padding:4px 10px;
+      font-size:12px;
+      font-weight:800;
+      z-index:11;
+    }
+
+    /* Placeholder panels */
+    .grid{
+      display:grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap:16px;
+      max-width: 1200px;
+    }
+    .card{
+      background:#fff;
+      border:1px solid #eee;
+      border-radius:12px;
+      padding:14px;
+      box-shadow:0 2px 8px rgba(0,0,0,0.04);
+    }
+    .card h2{ margin:0 0 10px 0; font-size:14px; font-weight:900; }
+    .muted{ color:#666; font-size:13px; line-height:1.4; }
+  </style>
+</head>
+<body>
+
+<div id="app">
+  <div id="header">
+    <h1>Coordination Dashboard — Benishangul-Gumuz</h1>
+    <div class="actions">
+      <button class="btn" id="btn-open-map" type="button">Open full map</button>
+      <button class="btn" id="btn-update" type="button" title="Coming soon">Update data (coming soon)</button>
+    </div>
+  </div>
+
+  <div id="content">
+    <div class="grid">
+      <div class="card">
+        <h2>Coordination tools (placeholder)</h2>
+        <div class="muted">
+          Next step: add a scrollable timeline sorted by period_month (monthly).
+        </div>
+      </div>
+      <div class="card">
+        <h2>Data quality (placeholder)</h2>
+        <div class="muted">
+          Next step: add freshness KPIs and charts.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="minimap-wrap" title="Click to open the full map">
+    <div id="minimap-badge">Benishangul-Gumuz</div>
+    <div id="minimap"></div>
+  </div>
+</div>
+
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+  // GitHub Pages safe base path
+  const BASE = window.location.pathname.endsWith('/')
+    ? window.location.pathname
+    : window.location.pathname.replace(/\/[^\/]*$/, '/');
+  const url = (p) => BASE + p.replace(/^\//, '');
+
+  const ETH_ADM1_URL = url('data/eth_admin1.geojson');
+
+  document.getElementById('btn-open-map').addEventListener('click', () => {
+    window.location.href = url('index.html');
+  });
+  document.getElementById('minimap-wrap').addEventListener('click', () => {
+    window.location.href = url('index.html');
+  });
+  document.getElementById('btn-update').addEventListener('click', () => {
+    alert("Update workflow not connected yet.\n\nLater: link this to a Google Form/Sheet or an upload flow.");
+  });
+
+  // Minimap boundaries-only
+  const mm = L.map('minimap', {
+    zoomControl: false,
+    attributionControl: false,
+    dragging: false,
+    scrollWheelZoom: false,
+    doubleClickZoom: false,
+    boxZoom: false,
+    keyboard: false,
+    tap: false
+  }).setView([10.5, 35.7], 7);
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors'
+  }).addTo(mm);
+
+  fetch(ETH_ADM1_URL).then(r => r.json()).then(fc => {
+    const ben = (fc.features || []).filter(f => f.properties?.adm1_pcode === 'ET06');
+    const layer = L.geoJSON({ type:'FeatureCollection', features: ben }, {
+      style: { color:'#ff0000', weight:3, fillOpacity:0 }
+    }).addTo(mm);
+
+    mm.fitBounds(layer.getBounds(), { padding:[10,10] });
+  }).catch(err => console.error('ADM1 load error:', err));
+</script>
+
+</body>
+</html>
