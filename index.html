@@ -1,875 +1,295 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <title>Coordination Dashboard — Benishangul-Gumuz (Nutrition)</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="utf-8" />
+<title>Coordination Dashboard — Benishangul-Gumuz (Nutrition)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <!-- Chart.js (donut) -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 
-  <style>
-    :root{
-      --bg:#f6f7f9;
-      --card:#ffffff;
-      --text:#111;
-      --muted:#666;
-      --border:#e7e7ea;
+<style>
+:root{
+  --bg:#f6f7f9;
+  --card:#ffffff;
+  --text:#111;
+  --muted:#666;
+  --border:#e7e7ea;
 
-      --green:#2ca02c;
-      --orange:#ff7f0e;
-      --red:#d62728;
-      --grey:#bdbdbd;
+  --green:#2ca02c;
+  --orange:#ff7f0e;
+  --red:#d62728;
+  --grey:#bdbdbd;
 
-      --shadow: 0 10px 22px rgba(0,0,0,0.07);
-      --radius:14px;
-    }
+  --shadow: 0 10px 22px rgba(0,0,0,0.07);
+  --radius:14px;
+}
 
-    html, body { height:100%; margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial; color:var(--text); background:var(--bg); }
+html,body{
+  margin:0;
+  background:var(--bg);
+  font-family:system-ui, -apple-system, Segoe UI, Roboto, Arial;
+  color:var(--text);
+}
 
-    /* Top bar */
-    .topbar{
-      height:56px;
-      background:#fff;
-      border-bottom:1px solid var(--border);
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      padding:0 18px;
-      position:sticky;
-      top:0;
-      z-index:5;
-    }
-    .topbar h1{
-      font-size:16px;
-      margin:0;
-      font-weight:800;
-    }
-    .actions{
-      display:flex;
-      align-items:center;
-      gap:10px;
-    }
-    .btn{
-      border:1px solid var(--border);
-      background:#fff;
-      padding:8px 10px;
-      border-radius:10px;
-      font-weight:700;
-      cursor:pointer;
-      font-size:13px;
-      text-decoration:none;
-      color:inherit;
-      display:inline-flex;
-      align-items:center;
-      gap:8px;
-    }
-    .btn:hover{ background:#fafafa; }
-    .btn[disabled]{ opacity:0.55; cursor:not-allowed; }
+.topbar{
+  height:56px;
+  background:#fff;
+  border-bottom:1px solid var(--border);
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:0 18px;
+}
 
-    /* Layout */
-    .wrap{ padding:14px 18px 22px; }
-    .grid{
-      display:grid;
-      grid-template-columns: 1.25fr 0.9fr 0.65fr;
-      gap:14px;
-      align-items:start;
-    }
-    @media (max-width: 1100px){
-      .grid{ grid-template-columns: 1fr; }
-    }
+.topbar h1{
+  font-size:15px;
+  font-weight:900;
+  margin:0;
+}
 
-    /* Cards */
-    .card{
-      background:var(--card);
-      border:1px solid var(--border);
-      border-radius:var(--radius);
-      box-shadow: var(--shadow);
-      overflow:hidden;
-    }
-    .card .hd{
-      padding:14px 14px 10px;
-      border-bottom:1px solid var(--border);
-    }
-    .card .hd .title{
-      font-weight:900;
-      font-size:14px;
-      margin:0 0 6px 0;
-    }
-    .card .hd .sub{
-      margin:0;
-      color:var(--muted);
-      font-size:12px;
-      line-height:1.35;
-    }
-    .card .bd{ padding:12px 14px 14px; }
+.actions{ display:flex; gap:10px; }
 
-    /* Timeline */
-    .row{
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:10px;
-      flex-wrap:wrap;
-    }
-    .chips{
-      display:flex;
-      gap:10px;
-      flex-wrap:wrap;
-      align-items:center;
-    }
-    .chip{
-      display:inline-flex;
-      align-items:center;
-      gap:8px;
-      font-size:12px;
-      color:#222;
-      user-select:none;
-    }
-    .chip input{ transform: translateY(1px); }
-    .muted{ color:var(--muted); }
-    .count{ font-weight:800; color:#333; }
-    .scroll{
-      max-height: 430px;
-      overflow:auto;
-      padding-right:6px;
-    }
+.btn{
+  border:1px solid var(--border);
+  padding:7px 10px;
+  border-radius:10px;
+  font-weight:900;
+  font-size:13px;
+  text-decoration:none;
+  color:inherit;
+  background:#fff;
+}
 
-    .monthHdr{
-      font-weight:900;
-      font-size:18px;
-      margin:12px 0 8px;
-    }
-    .item{
-      border-top:1px solid #f0f0f2;
-      padding:10px 0;
-      display:flex;
-      justify-content:space-between;
-      gap:12px;
-      align-items:flex-start;
-    }
-    .item .left{ min-width:0; }
-    .org{
-      font-weight:900;
-      font-size:14px;
-      margin-bottom:3px;
-      display:flex;
-      align-items:center;
-      gap:8px;
-      flex-wrap:wrap;
-    }
-    .line{
-      font-size:13px;
-      color:#333;
-    }
-    .line2{
-      font-size:13px;
-      color:var(--muted);
-      margin-top:2px;
-    }
-    .pill{
-      font-size:12px;
-      font-weight:800;
-      padding:2px 10px;
-      border-radius:999px;
-      color:#fff;
-      white-space:nowrap;
-      line-height:18px;
-    }
-    .pill.planned{ background:#808080; }
-    .pill.ongoing{ background:#1f77b4; }
-    .pill.completed{ background:#2ca02c; }
-    .pill.paused{ background:#ff7f0e; }
+.wrap{
+  max-width:1500px;
+  margin:0 auto;
+  padding:18px;
+}
 
-    /* Data quality donut + table */
-    .dqWrap{
-      display:flex;
-      align-items:center;
-      gap:14px;
-      margin:10px 0 12px;
-    }
-    .dqCanvasBox{ width:150px; height:150px; flex:0 0 auto; }
-    #dq-legend{
-      font-size:12px;
-      color:var(--muted);
-      line-height:1.5;
-      min-width: 200px;
-    }
-    .legendRow{
-      display:flex;
-      align-items:center;
-      gap:8px;
-      margin:4px 0;
-    }
-    .dot{
-      width:10px;height:10px;border-radius:50%;
-      display:inline-block;
-    }
-    .dot.g{ background:var(--green); }
-    .dot.o{ background:var(--orange); }
-    .dot.r{ background:var(--red); }
-    .dot.n{ background:var(--grey); }
+.grid{
+  display:grid;
+  grid-template-columns: 1.25fr 0.95fr 0.65fr;
+  gap:14px;
+}
 
-    table{
-      width:100%;
-      border-collapse:collapse;
-      font-size:13px;
-    }
-    thead th{
-      text-align:left;
-      font-size:12px;
-      color:var(--muted);
-      font-weight:800;
-      padding:8px 0;
-      border-bottom:1px solid #f0f0f2;
-    }
-    tbody td{
-      padding:9px 0;
-      border-bottom:1px solid #f4f4f6;
-      vertical-align:middle;
-    }
-    .orgCell{
-      display:flex;
-      align-items:center;
-      gap:10px;
-      min-width:0;
-    }
-    .orgName{
-      font-weight:800;
-      white-space:nowrap;
-      overflow:hidden;
-      text-overflow:ellipsis;
-      max-width: 290px;
-    }
-    .small{
-      color:var(--muted);
-      font-weight:700;
-    }
-    .dateCell{
-      font-variant-numeric: tabular-nums;
-      font-weight:800;
-    }
+@media(max-width:1280px){
+  .grid{ grid-template-columns:1fr 1fr; }
+  .grid > :nth-child(3){ grid-column:1/-1; }
+}
 
-    /* Woreda table */
-    .controlsLine{
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:10px;
-      margin:8px 0 10px;
-      flex-wrap:wrap;
-    }
-    select{
-      border:1px solid var(--border);
-      border-radius:10px;
-      padding:6px 10px;
-      background:#fff;
-      font-weight:700;
-    }
-    .wScroll{ max-height: 260px; overflow:auto; padding-right:6px; }
-    .wTable thead th:last-child,
-    .wTable tbody td:last-child{ text-align:right; padding-right:2px; }
-    .wName{ font-weight:900; }
+@media(max-width:820px){
+  .grid{ grid-template-columns:1fr; }
+}
 
-    /* Right column mini map placeholder */
-    .miniMap{
-      height: 220px;
-      background: linear-gradient(180deg, #ffffff, #fafafa);
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      color:var(--muted);
-      font-weight:800;
-      font-size:13px;
-    }
-    .miniMapBox{
-      margin: 14px;
-      border:1px solid var(--border);
-      border-radius: 14px;
-      overflow:hidden;
-      box-shadow: var(--shadow);
-    }
+.card{
+  background:#fff;
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  box-shadow:var(--shadow);
+  overflow:hidden;
+}
 
-    /* Status bar */
-    .statusbar{
-      margin-top:12px;
-      font-size:12px;
-      color:var(--muted);
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:12px;
-      flex-wrap:wrap;
-    }
-    .err{
-      color:#b00020;
-      font-weight:800;
-    }
-  </style>
+.card .hd{
+  padding:14px;
+  border-bottom:1px solid var(--border);
+}
+
+.card .hd .title{
+  font-weight:900;
+  font-size:14px;
+  margin-bottom:4px;
+}
+
+.card .bd{ padding:14px; }
+
+.scroll{ max-height:52vh; overflow:auto; }
+
+.pill{
+  font-size:11px;
+  font-weight:900;
+  padding:2px 8px;
+  border-radius:999px;
+  color:#fff;
+}
+
+.pill.planned{background:#808080;}
+.pill.ongoing{background:#1f77b4;}
+.pill.completed{background:#2ca02c;}
+.pill.paused{background:#ff7f0e;}
+
+.wRow{ cursor:pointer; }
+.wRow:hover{ background:#fafafa; }
+
+.miniMapBox{ position:relative; margin:14px; }
+.miniMapFrame{ width:100%; height:220px; border:0; }
+.miniMapOverlay{ position:absolute; inset:0; cursor:pointer; }
+.miniMapHint{
+  position:absolute;
+  bottom:10px; right:10px;
+  background:#fff;
+  padding:4px 8px;
+  border-radius:999px;
+  font-size:12px;
+  font-weight:900;
+  border:1px solid var(--border);
+}
+
+.dot{ width:10px;height:10px;border-radius:50%;display:inline-block; }
+.dot.g{background:var(--green);}
+.dot.o{background:var(--orange);}
+.dot.r{background:var(--red);}
+.dot.n{background:var(--grey);}
+</style>
 </head>
 
 <body>
-  <div class="topbar">
-    <h1>Coordination Dashboard — Benishangul-Gumuz (Nutrition)</h1>
-    <div class="actions">
-      <!-- Adjust this href to your map page if needed -->
-      <a class="btn" href="./index.html" onclick="return true;" title="Open full map in a new tab" target="_blank" rel="noopener">Open full map</a>
-      <button class="btn" type="button" disabled title="Coming soon">Update data (coming soon)</button>
+
+<div class="topbar">
+  <h1>Coordination Dashboard — Benishangul-Gumuz</h1>
+  <div class="actions">
+    <a class="btn" href="./map.html" target="_blank">Open full map</a>
+  </div>
+</div>
+
+<div class="wrap">
+<div class="grid">
+
+<!-- LEFT -->
+<div class="card">
+  <div class="hd">
+    <div class="title">Woreda Coverage</div>
+  </div>
+  <div class="bd">
+    <select id="w-month"><option value="">All months</option></select>
+    <div class="scroll">
+      <table width="100%">
+        <thead>
+          <tr><th>Woreda</th><th align="right">#</th></tr>
+        </thead>
+        <tbody id="woreda-body"></tbody>
+      </table>
     </div>
   </div>
+</div>
 
-  <div class="wrap">
-    <div class="grid">
+<!-- MIDDLE -->
+<div class="card">
+  <div class="hd">
+    <div class="title">Data Quality</div>
+  </div>
+  <div class="bd">
+    <div style="width:160px;height:160px;">
+      <canvas id="dq-donut"></canvas>
+    </div>
+    <div id="dq-body"></div>
+  </div>
+</div>
 
-      <!-- LEFT: Timeline + Woreda coverage -->
-      <div class="card">
-        <div class="hd">
-          <div class="title">Timeline (by month)</div>
-          <p class="sub">Scrollable list grouped by <b>period_month</b> (latest first). Status filters apply only to this timeline.</p>
-        </div>
-        <div class="bd">
-          <div class="row">
-            <div class="chips">
-              <label class="chip"><input type="checkbox" id="st-completed" checked> completed</label>
-              <label class="chip"><input type="checkbox" id="st-ongoing" checked> ongoing</label>
-              <label class="chip"><input type="checkbox" id="st-planned" checked> planned</label>
-              <label class="chip"><input type="checkbox" id="st-paused" checked> paused</label>
-            </div>
-            <div class="count"><span id="tl-count">0</span> shown</div>
-          </div>
-
-          <div class="scroll" id="timeline"></div>
-
-          <div style="height:12px;"></div>
-
-          <div class="title" style="font-weight:900; font-size:14px; margin:0 0 6px;">Woreda coverage (Nutrition)</div>
-          <p class="sub" style="margin:0 0 10px;">Spatial view for the Nutrition cluster: by woreda → interventions count. Month filter applies to this table only.</p>
-
-          <div class="controlsLine">
-            <div class="row" style="gap:8px;">
-              <span class="small">Month</span>
-              <select id="w-month">
-                <option value="">All</option>
-              </select>
-            </div>
-            <div class="small"><span id="w-count">0</span> woredas</div>
-          </div>
-
-          <div class="wScroll">
-            <table class="wTable">
-              <thead>
-                <tr>
-                  <th>Woreda</th>
-                  <th># interventions</th>
-                </tr>
-              </thead>
-              <tbody id="woreda-body"></tbody>
-            </table>
-          </div>
-
-          <div class="statusbar">
-            <div>Source: Google Sheets CSV</div>
-            <div id="load-status" class="small">Loading…</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- MIDDLE: Data quality -->
-      <div class="card">
-        <div class="hd">
-          <div class="title">Data quality — last org update</div>
-          <p class="sub">Latest <b>last_update</b> per organisation (based on current dataset). Donut reflects this table. Hover segments to see org names.</p>
-        </div>
-        <div class="bd">
-
-          <div class="dqWrap">
-            <div class="dqCanvasBox">
-              <canvas id="dq-donut"></canvas>
-            </div>
-            <div id="dq-legend"></div>
-          </div>
-
-          <table>
-            <thead>
-              <tr>
-                <th>Organisation</th>
-                <th style="text-align:right;">Last update</th>
-              </tr>
-            </thead>
-            <tbody id="dq-body"></tbody>
-          </table>
-
-          <div class="statusbar">
-            <div class="small">Bands: ≤7d (green), 8–21d (orange), &gt;21d (red), n/a (grey)</div>
-            <div id="dq-summary" class="small"></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- RIGHT: small map preview placeholder -->
-      <div class="card">
-        <div class="hd">
-          <div class="title">Map preview</div>
-          <p class="sub">Open the full map from the top-right button.</p>
-        </div>
-        <div class="bd" style="padding:0;">
-          <div class="miniMapBox">
-            <div class="miniMap">Map preview (placeholder)</div>
-          </div>
-        </div>
-      </div>
-
+<!-- RIGHT -->
+<div class="card">
+  <div class="hd">
+    <div class="title">Map Preview</div>
+  </div>
+  <div class="bd" style="padding:0;">
+    <div class="miniMapBox">
+      <iframe class="miniMapFrame" src="./map.html"></iframe>
+      <a class="miniMapOverlay" href="./map.html" target="_blank"></a>
+      <div class="miniMapHint">Click to open full map</div>
     </div>
   </div>
+</div>
+
+</div>
+</div>
 
 <script>
-  // ✅ Your CSV URL
-  const INTERVENTIONS_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR_vGAsaVP8WM3PKX1SEcNSit7Ldh5SjwM9c-F01nmS-mDghFpNHcARtVDOzo1Qc7okT2be-Oi05msp/pub?output=csv";
+const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR_vGAsaVP8WM3PKX1SEcNSit7Ldh5SjwM9c-F01nmS-mDghFpNHcARtVDOzo1Qc7okT2be-Oi05msp/pub?output=csv";
 
-  /* -------------------------
-     CSV parsing (robust enough)
-     ------------------------- */
-  function parseCSV(text) {
-    const rows = [];
-    let row = [];
-    let cell = '';
-    let inQuotes = false;
-
-    for (let i = 0; i < text.length; i++) {
-      const ch = text[i];
-      const next = text[i + 1];
-
-      if (ch === '"') {
-        if (inQuotes && next === '"') { cell += '"'; i++; }
-        else { inQuotes = !inQuotes; }
-      } else if (ch === ',' && !inQuotes) {
-        row.push(cell); cell = '';
-      } else if ((ch === '\n' || ch === '\r') && !inQuotes) {
-        if (ch === '\r' && next === '\n') i++;
-        row.push(cell);
-        rows.push(row);
-        row = [];
-        cell = '';
-      } else {
-        cell += ch;
-      }
-    }
-    if (cell.length || row.length) {
-      row.push(cell);
-      rows.push(row);
-    }
-    return rows;
+function parseCSV(text){
+  const rows=[];let row=[],cell="",inQ=false;
+  for(let i=0;i<text.length;i++){
+    const c=text[i],n=text[i+1];
+    if(c=='"'){ if(inQ&&n=='"'){cell+='"';i++;} else inQ=!inQ;}
+    else if(c==','&&!inQ){row.push(cell);cell="";}
+    else if((c=='\n'||c=='\r')&&!inQ){row.push(cell);rows.push(row);row=[];cell="";}
+    else cell+=c;
   }
+  return rows;
+}
 
-  function csvToObjects(csvText) {
-    const grid = parseCSV(csvText).filter(r => r.some(c => String(c).trim() !== ''));
-    if (!grid.length) return [];
-    const headers = grid[0].map(h => String(h).trim());
-    const out = [];
-    for (let i = 1; i < grid.length; i++) {
-      const r = grid[i];
-      const obj = {};
-      headers.forEach((h, j) => { obj[h] = (r[j] ?? '').toString().trim(); });
-      out.push(obj);
-    }
-    return out;
-  }
+function freshness(d){
+  const date=new Date(d);
+  if(isNaN(date)) return 'na';
+  let days=Math.floor((Date.now()-date)/86400000);
+  if(days<0) days=0;
+  if(days<=7) return 'green';
+  if(days<=21) return 'orange';
+  return 'red';
+}
 
-  /* -------------------------
-     Freshness / dates
-     ------------------------- */
-  function parseDateLoose(v) {
-    if (!v) return null;
-    if (v instanceof Date && !isNaN(v)) return v;
+fetch(CSV_URL).then(r=>r.text()).then(t=>{
+  const grid=parseCSV(t);
+  const headers=grid[0];
+  const data=grid.slice(1).map(r=>{
+    let o={}; headers.forEach((h,i)=>o[h]=r[i]); return o;
+  });
 
-    const s = String(v).trim();
-    if (!s) return null;
+  // Populate months
+  const months=[...new Set(data.map(d=>d.period_month))];
+  const sel=document.getElementById("w-month");
+  months.forEach(m=>{
+    const opt=document.createElement("option");
+    opt.value=m; opt.textContent=m;
+    sel.appendChild(opt);
+  });
 
-    // YYYY-MM-DD (or YYYY/MM/DD)
-    const m = s.match(/^(\d{4})[-\/](\d{2})[-\/](\d{2})/);
-    if (m) {
-      const y = Number(m[1]), mo = Number(m[2]) - 1, d0 = Number(m[3]);
-      const d = new Date(y, mo, d0);
-      return isNaN(d) ? null : d;
-    }
-    const d = new Date(s);
-    return isNaN(d) ? null : d;
-  }
+  function render(){
+    const month=sel.value;
+    const filtered=month?data.filter(d=>d.period_month==month):data;
 
-  function freshnessFromLastUpdate(lastUpdate) {
-    const d = parseDateLoose(lastUpdate);
-    if (!d) return { band: 'na', color: getComputedStyle(document.documentElement).getPropertyValue('--grey').trim(), days: null };
-    const now = new Date();
-    const diffMs = now - d;
-    const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-    if (!isFinite(days) || days < 0) return { band: 'na', color: getComputedStyle(document.documentElement).getPropertyValue('--grey').trim(), days: null };
-    if (days <= 7)  return { band: 'green',  color: getComputedStyle(document.documentElement).getPropertyValue('--green').trim(), days };
-    if (days <= 21) return { band: 'orange', color: getComputedStyle(document.documentElement).getPropertyValue('--orange').trim(), days };
-    return { band: 'red', color: getComputedStyle(document.documentElement).getPropertyValue('--red').trim(), days };
-  }
-
-  function escapeHtml(str) {
-    return String(str ?? '')
-      .replace(/&/g,'&amp;')
-      .replace(/</g,'&lt;')
-      .replace(/>/g,'&gt;')
-      .replace(/"/g,'&quot;')
-      .replace(/'/g,'&#039;');
-  }
-
-  function statusClass(status) {
-    const s = String(status || '').toLowerCase();
-    if (s === 'planned') return 'planned';
-    if (s === 'ongoing') return 'ongoing';
-    if (s === 'completed') return 'completed';
-    if (s === 'paused') return 'paused';
-    return 'planned';
-  }
-
-  /* -------------------------
-     App state
-     ------------------------- */
-  let rows = []; // objects from CSV
-  let dqChart = null;
-  let dqBandToOrgs = { green: [], orange: [], red: [], na: [] };
-
-  function getTimelineStatusFilterSet() {
-    const set = new Set();
-    if (document.getElementById('st-completed').checked) set.add('completed');
-    if (document.getElementById('st-ongoing').checked) set.add('ongoing');
-    if (document.getElementById('st-planned').checked) set.add('planned');
-    if (document.getElementById('st-paused').checked) set.add('paused');
-    return set;
-  }
-
-  /* -------------------------
-     Timeline rendering
-     ------------------------- */
-  function renderTimeline() {
-    const container = document.getElementById('timeline');
-    container.innerHTML = '';
-
-    const allowed = getTimelineStatusFilterSet();
-
-    const filtered = rows.filter(r => {
-      const st = String(r.status || '').toLowerCase();
-      return allowed.has(st);
+    const map={};
+    filtered.forEach(d=>{
+      map[d.woreda]=(map[d.woreda]||0)+1;
     });
 
-    // group by period_month
-    const byMonth = new Map();
-    for (const r of filtered) {
-      const m = (r.period_month || '').trim() || 'Unknown';
-      if (!byMonth.has(m)) byMonth.set(m, []);
-      byMonth.get(m).push(r);
-    }
-
-    // sort months descending (treat YYYY-MM)
-    const months = [...byMonth.keys()].sort((a,b) => b.localeCompare(a));
-
-    let totalShown = 0;
-    for (const m of months) {
-      const list = byMonth.get(m) || [];
-      // simple stable sorting
-      list.sort((a,b) => {
-        const oa = (a.org_name || '').localeCompare(b.org_name || '');
-        if (oa !== 0) return oa;
-        return (a.woreda || '').localeCompare(b.woreda || '');
-      });
-
-      const hdr = document.createElement('div');
-      hdr.className = 'monthHdr';
-      hdr.textContent = m;
-      container.appendChild(hdr);
-
-      for (const r of list) {
-        totalShown++;
-
-        const org = r.org_name || 'Unknown org';
-        const woreda = r.woreda || '-';
-        const site = r.site_name || '-';
-        const status = String(r.status || '').toLowerCase() || '-';
-        const stClass = statusClass(status);
-
-        const it = document.createElement('div');
-        it.className = 'item';
-        it.innerHTML = `
-          <div class="left">
-            <div class="org">${escapeHtml(org)}</div>
-            <div class="line">${escapeHtml(woreda)} — ${escapeHtml(site)} — <span class="muted">${escapeHtml(r.activity_name || '')}</span></div>
-          </div>
-          <div class="pill ${stClass}">${escapeHtml(status)}</div>
-        `;
-        container.appendChild(it);
-      }
-    }
-
-    document.getElementById('tl-count').textContent = totalShown.toString();
-  }
-
-  /* -------------------------
-     Woreda coverage rendering
-     ------------------------- */
-  function renderWoredaTable() {
-    const sel = document.getElementById('w-month');
-    const month = sel.value; // '' = All
-
-    const filtered = rows.filter(r => {
-      const pm = (r.period_month || '').trim();
-      return month ? pm === month : true;
-    });
-
-    const counts = new Map();
-    for (const r of filtered) {
-      const w = (r.woreda || '').trim() || 'Unknown';
-      counts.set(w, (counts.get(w) || 0) + 1);
-    }
-
-    const items = [...counts.entries()]
-      .map(([w, n]) => ({ w, n }))
-      .sort((a,b) => b.n - a.n || a.w.localeCompare(b.w));
-
-    const body = document.getElementById('woreda-body');
-    body.innerHTML = '';
-
-    for (const it of items) {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td class="wName">${escapeHtml(it.w)}</td>
-        <td>${it.n}</td>
-      `;
+    const body=document.getElementById("woreda-body");
+    body.innerHTML="";
+    Object.entries(map).sort((a,b)=>b[1]-a[1]).forEach(([w,n])=>{
+      const tr=document.createElement("tr");
+      tr.className="wRow";
+      tr.innerHTML=`<td>${w}</td><td align="right">${n}</td>`;
       body.appendChild(tr);
-    }
-
-    document.getElementById('w-count').textContent = items.length.toString();
-  }
-
-  function populateMonthDropdown() {
-    const sel = document.getElementById('w-month');
-    // keep first option (All)
-    const existing = new Set([...sel.options].map(o => o.value));
-    const months = [...new Set(rows.map(r => (r.period_month || '').trim()).filter(Boolean))].sort((a,b)=> b.localeCompare(a));
-    for (const m of months) {
-      if (existing.has(m)) continue;
-      const opt = document.createElement('option');
-      opt.value = m;
-      opt.textContent = m;
-      sel.appendChild(opt);
-    }
-  }
-
-  /* -------------------------
-     Data quality rendering (donut + table)
-     ------------------------- */
-  function computeDataQuality() {
-    // latest last_update per org (based on current dataset)
-    const latest = new Map(); // org -> {dateStr, dateObj, count}
-    for (const r of rows) {
-      const org = (r.org_name || '').trim() || 'Unknown';
-      const d = parseDateLoose(r.last_update);
-      const entry = latest.get(org) || { dateObj: null, dateStr: '', count: 0 };
-      entry.count += 1;
-
-      if (d && (!entry.dateObj || d > entry.dateObj)) {
-        entry.dateObj = d;
-        entry.dateStr = (r.last_update || '').trim();
-      } else if (!entry.dateObj && (r.last_update || '').trim()) {
-        // if we never got a parsable date, keep the first non-empty string
-        entry.dateStr = entry.dateStr || (r.last_update || '').trim();
-      }
-      latest.set(org, entry);
-    }
-
-    const orgRows = [];
-    dqBandToOrgs = { green: [], orange: [], red: [], na: [] };
-
-    for (const [org, info] of latest.entries()) {
-      const fr = freshnessFromLastUpdate(info.dateObj || info.dateStr);
-      orgRows.push({
-        org,
-        count: info.count,
-        last_update: info.dateStr || (info.dateObj ? info.dateObj.toISOString().slice(0,10) : ''),
-        fr
-      });
-      dqBandToOrgs[fr.band === 'na' ? 'na' : fr.band].push(org);
-    }
-
-    // sort: worst first (red -> orange -> green -> na), then org alpha
-    const rank = (band) => band === 'red' ? 3 : band === 'orange' ? 2 : band === 'green' ? 1 : 0;
-    orgRows.sort((a,b) => {
-      const ra = rank(a.fr.band), rb = rank(b.fr.band);
-      if (rb !== ra) return rb - ra;
-      return a.org.localeCompare(b.org);
     });
 
-    return orgRows;
-  }
+    // Data quality
+    const orgLatest={};
+    data.forEach(d=>{
+      if(!orgLatest[d.org_name]|| new Date(d.last_update)>new Date(orgLatest[d.org_name])){
+        orgLatest[d.org_name]=d.last_update;
+      }
+    });
 
-  function renderDataQuality() {
-    const orgRows = computeDataQuality();
+    const bands={green:0,orange:0,red:0,na:0};
+    Object.values(orgLatest).forEach(d=>{
+      bands[freshness(d)]++;
+    });
 
-    // counts for donut
-    const greenOrgs = dqBandToOrgs.green || [];
-    const orangeOrgs = dqBandToOrgs.orange || [];
-    const redOrgs = dqBandToOrgs.red || [];
-    const naOrgs = dqBandToOrgs.na || [];
-
-    const g = greenOrgs.length, o = orangeOrgs.length, r = redOrgs.length, n = naOrgs.length;
-    const total = g + o + r + n;
-
-    // legend text
-    document.getElementById('dq-legend').innerHTML = `
-      <div class="legendRow"><span class="dot g"></span> ≤7 days: <b>${g}</b></div>
-      <div class="legendRow"><span class="dot o"></span> 8–21 days: <b>${o}</b></div>
-      <div class="legendRow"><span class="dot r"></span> >21 days: <b>${r}</b></div>
-      <div class="legendRow"><span class="dot n"></span> n/a: <b>${n}</b></div>
-      <div style="margin-top:6px;"><span class="small">Total orgs:</span> <b>${total}</b></div>
-    `;
-
-    // table
-    const body = document.getElementById('dq-body');
-    body.innerHTML = '';
-    for (const it of orgRows) {
-      const band = it.fr.band;
-      const dotClass = band === 'green' ? 'g' : band === 'orange' ? 'o' : band === 'red' ? 'r' : 'n';
-      const title = band === 'na'
-        ? 'No valid last_update'
-        : `${it.fr.days} day(s) old`;
-
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td>
-          <div class="orgCell">
-            <span class="dot ${dotClass}" title="${escapeHtml(title)}"></span>
-            <div class="orgName" title="${escapeHtml(it.org)}">${escapeHtml(it.org)}</div>
-            <span class="small">(${it.count})</span>
-          </div>
-        </td>
-        <td class="dateCell" style="text-align:right;">
-          ${escapeHtml(it.last_update || '—')}
-        </td>
-      `;
-      body.appendChild(tr);
-    }
-
-    document.getElementById('dq-summary').textContent = total ? `${total} organisations tracked` : 'No organisations';
-
-    // donut chart
-    const ctx = document.getElementById('dq-donut').getContext('2d');
-
-    const labels = ['≤7 days', '8–21 days', '>21 days', 'n/a'];
-    const data = [g, o, r, n];
-
-    const colors = [
-      getComputedStyle(document.documentElement).getPropertyValue('--green').trim(),
-      getComputedStyle(document.documentElement).getPropertyValue('--orange').trim(),
-      getComputedStyle(document.documentElement).getPropertyValue('--red').trim(),
-      getComputedStyle(document.documentElement).getPropertyValue('--grey').trim()
-    ];
-
-    const bandOrgs = [greenOrgs, orangeOrgs, redOrgs, naOrgs];
-
-    if (dqChart) dqChart.destroy();
-
-    dqChart = new Chart(ctx, {
-      type: 'doughnut',
-      data: {
-        labels,
-        datasets: [{
-          data,
-          backgroundColor: colors,
-          borderWidth: 0
+    new Chart(document.getElementById("dq-donut"),{
+      type:'doughnut',
+      data:{
+        labels:["≤7d","8–21d",">21d","n/a"],
+        datasets:[{
+          data:[bands.green,bands.orange,bands.red,bands.na],
+          backgroundColor:["#2ca02c","#ff7f0e","#d62728","#bdbdbd"]
         }]
       },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        cutout: '68%',
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              title: (items) => {
-                const i = items[0].dataIndex;
-                return `${labels[i]} — ${data[i]} org(s)`;
-              },
-              label: (item) => {
-                const i = item.dataIndex;
-                const orgs = bandOrgs[i] || [];
-                if (!orgs.length) return '—';
-                // Keep tooltips readable; don’t dump 80 names
-                const max = 14;
-                const shown = orgs.slice(0, max);
-                const rest = orgs.length - shown.length;
-                const line = shown.join(', ');
-                return rest > 0 ? `${line} … (+${rest})` : line;
-              }
-            }
-          }
-        }
-      }
-    });
-
-    // center text (total) via simple overlay using CSS-less trick: set aria label only.
-    // (If you want center text drawn, we can add a tiny Chart.js plugin later.)
-  }
-
-  /* -------------------------
-     Wire events
-     ------------------------- */
-  function wireEvents() {
-    ['st-completed','st-ongoing','st-planned','st-paused'].forEach(id => {
-      document.getElementById(id).addEventListener('change', () => {
-        renderTimeline();
-      });
-    });
-
-    document.getElementById('w-month').addEventListener('change', () => {
-      renderWoredaTable();
+      options:{cutout:"70%",plugins:{legend:{display:false}}}
     });
   }
 
-  /* -------------------------
-     Load
-     ------------------------- */
-  async function main() {
-    const statusEl = document.getElementById('load-status');
-    try {
-      statusEl.textContent = 'Loading CSV…';
-      const resp = await fetch(INTERVENTIONS_URL);
-      if (!resp.ok) throw new Error(`CSV fetch failed: ${resp.status}`);
-      const csvText = await resp.text();
-
-      rows = csvToObjects(csvText);
-
-      // minimal sanity: normalize keys we rely on
-      rows = rows.map(r => ({
-        ...r,
-        org_name: (r.org_name || r.organisation || r.organization || '').trim() || r.org_name,
-        period_month: (r.period_month || r.month || '').trim() || r.period_month,
-        last_update: (r.last_update || r.lastupdated || '').trim() || r.last_update,
-        status: (r.status || '').trim(),
-        woreda: (r.woreda || '').trim(),
-        site_name: (r.site_name || r.site || '').trim() || r.site_name,
-        activity_name: (r.activity_name || r.activity || '').trim() || r.activity_name
-      }));
-
-      statusEl.textContent = `Loaded ${rows.length} records`;
-
-      populateMonthDropdown();
-      renderTimeline();
-      renderWoredaTable();
-      renderDataQuality();
-      wireEvents();
-
-      // refresh data quality + woreda/month options if you later implement live updates.
-    } catch (e) {
-      statusEl.innerHTML = `<span class="err">Error:</span> ${escapeHtml(e.message || String(e))}`;
-      console.error(e);
-    }
-  }
-
-  main();
+  sel.addEventListener("change",render);
+  render();
+});
 </script>
 
 </body>
