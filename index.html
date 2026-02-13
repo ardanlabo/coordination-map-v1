@@ -5,393 +5,125 @@
   <title>Coordination Dashboard — Benishangul-Gumuz (Nutrition)</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <!-- Chart.js for donut -->
+  <!-- Robust CSV parser -->
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <!-- Donut -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 
   <style>
     :root{
-      --bg:#f6f7f9;
-      --card:#ffffff;
-      --text:#111;
-      --muted:#666;
-      --border:#e7e7ea;
-
-      --green:#2ca02c;
-      --orange:#ff7f0e;
-      --red:#d62728;
-      --grey:#bdbdbd;
-
-      --shadow: 0 10px 22px rgba(0,0,0,0.07);
-      --radius:14px;
+      --bg:#f6f7f9; --card:#fff; --text:#111; --muted:#666; --border:#e7e7ea;
+      --green:#2ca02c; --orange:#ff7f0e; --red:#d62728; --grey:#bdbdbd;
+      --shadow:0 10px 22px rgba(0,0,0,0.07); --radius:14px;
     }
+    html,body{margin:0;height:100%;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;color:var(--text);background:var(--bg);}
 
-    html, body { height:100%; margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial; color:var(--text); background:var(--bg); }
-
-    /* Top bar */
     .topbar{
-      height:56px;
-      background:#fff;
-      border-bottom:1px solid var(--border);
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      padding:0 18px;
-      position:sticky;
-      top:0;
-      z-index:5;
+      height:56px;background:#fff;border-bottom:1px solid var(--border);
+      display:flex;align-items:center;justify-content:space-between;padding:0 18px;
+      position:sticky;top:0;z-index:10;
     }
-    .topbar h1{
-      font-size: clamp(14px, 1.2vw, 16px);
-      margin:0;
-      font-weight:900;
-      white-space:nowrap;
-      overflow:hidden;
-      text-overflow:ellipsis;
-      max-width: 70vw;
-    }
-    .actions{
-      display:flex;
-      align-items:center;
-      gap:10px;
-    }
+    .topbar h1{font-size:15px;margin:0;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:70vw;}
+    .actions{display:flex;gap:10px;align-items:center;}
     .btn{
-      border:1px solid var(--border);
-      background:#fff;
-      padding:8px 10px;
-      border-radius:10px;
-      font-weight:900;
-      cursor:pointer;
-      font-size:13px;
-      text-decoration:none;
-      color:inherit;
-      display:inline-flex;
-      align-items:center;
-      gap:8px;
+      border:1px solid var(--border);background:#fff;padding:8px 10px;border-radius:10px;
+      font-weight:900;font-size:13px;text-decoration:none;color:inherit;cursor:pointer;
     }
-    .btn:hover{ background:#fafafa; }
-    .btn[disabled]{ opacity:0.55; cursor:not-allowed; }
+    .btn:hover{background:#fafafa;}
+    .btn[disabled]{opacity:.55;cursor:not-allowed;}
 
-    /* Layout */
-    .wrap{
-      padding:14px 18px 22px;
-      max-width: 1500px;
-      margin: 0 auto;
-    }
+    .wrap{max-width:1500px;margin:0 auto;padding:14px 18px 22px;}
     .grid{
-      display:grid;
-      grid-template-columns: 1.25fr 0.95fr 0.65fr;
-      gap:14px;
-      align-items:start;
+      display:grid;grid-template-columns:1.25fr .95fr .65fr;gap:14px;align-items:start;
     }
-    @media (max-width: 1280px){
-      .grid{ grid-template-columns: 1fr 1fr; }
-      .grid > :nth-child(3){ grid-column: 1 / -1; }
+    @media(max-width:1280px){
+      .grid{grid-template-columns:1fr 1fr;}
+      .grid>:nth-child(3){grid-column:1/-1;}
     }
-    @media (max-width: 820px){
-      .grid{ grid-template-columns: 1fr; }
-    }
+    @media(max-width:820px){.grid{grid-template-columns:1fr;}}
 
-    /* Cards */
     .card{
-      background:var(--card);
-      border:1px solid var(--border);
-      border-radius:var(--radius);
-      box-shadow: var(--shadow);
-      overflow:hidden;
+      background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+      box-shadow:var(--shadow);overflow:hidden;
     }
-    .card .hd{
-      padding:14px 14px 10px;
-      border-bottom:1px solid var(--border);
-    }
-    .card .hd .title{
-      font-weight:900;
-      font-size: clamp(13px, 1.1vw, 14px);
-      margin:0 0 6px 0;
-    }
-    .card .hd .sub{
-      margin:0;
-      color:var(--muted);
-      font-size:12px;
-      line-height:1.35;
-    }
-    .card .bd{ padding:12px 14px 14px; }
+    .hd{padding:14px 14px 10px;border-bottom:1px solid var(--border);}
+    .title{font-weight:900;font-size:14px;margin:0 0 6px;}
+    .sub{margin:0;color:var(--muted);font-size:12px;line-height:1.35;}
+    .bd{padding:12px 14px 14px;}
 
-    /* Timeline */
-    .row{
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:10px;
-      flex-wrap:wrap;
-    }
-    .chips{
-      display:flex;
-      gap:10px;
-      flex-wrap:wrap;
-      align-items:center;
-    }
-    .chip{
-      display:inline-flex;
-      align-items:center;
-      gap:8px;
-      font-size:12px;
-      color:#222;
-      user-select:none;
-    }
-    .chip input{ transform: translateY(1px); }
-    .muted{ color:var(--muted); }
-    .count{ font-weight:900; color:#333; font-variant-numeric: tabular-nums; }
+    .row{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
+    .chips{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+    .chip{display:inline-flex;align-items:center;gap:8px;font-size:12px;color:#222;user-select:none;}
+    .chip input{transform:translateY(1px);}
+    .count{font-weight:900;color:#333;font-variant-numeric:tabular-nums;}
+    .muted{color:var(--muted);}
 
-    .scroll{
-      max-height: min(52vh, 560px);
-      overflow:auto;
-      padding-right:6px;
-    }
-    .monthHdr{
-      font-weight:950;
-      font-size:18px;
-      margin:12px 0 8px;
-    }
-    .item{
-      border-top:1px solid #f0f0f2;
-      padding:10px 0;
-      display:flex;
-      justify-content:space-between;
-      gap:12px;
-      align-items:flex-start;
-    }
-    .item .left{ min-width:0; }
-    .org{
-      font-weight:900;
-      font-size: clamp(13px, 1.1vw, 14px);
-      margin-bottom:3px;
-      display:flex;
-      align-items:center;
-      gap:8px;
-      flex-wrap:wrap;
-    }
-    .line{
-      font-size:13px;
-      color:#333;
-    }
-    .pill{
-      font-size:12px;
-      font-weight:900;
-      padding:2px 10px;
-      border-radius:999px;
-      color:#fff;
-      white-space:nowrap;
-      line-height:18px;
-    }
-    .pill.planned{ background:#808080; }
-    .pill.ongoing{ background:#1f77b4; }
-    .pill.completed{ background:#2ca02c; }
-    .pill.paused{ background:#ff7f0e; }
+    .scroll{max-height:min(52vh,560px);overflow:auto;padding-right:6px;}
+    .monthHdr{font-weight:950;font-size:18px;margin:12px 0 8px;}
+    .item{border-top:1px solid #f0f0f2;padding:10px 0;display:flex;justify-content:space-between;gap:12px;align-items:flex-start;}
+    .item .left{min-width:0;}
+    .org{font-weight:900;font-size:14px;margin-bottom:3px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+    .line{font-size:13px;color:#333;}
+    .pill{font-size:12px;font-weight:900;padding:2px 10px;border-radius:999px;color:#fff;white-space:nowrap;line-height:18px;}
+    .pill.planned{background:#808080;}
+    .pill.ongoing{background:#1f77b4;}
+    .pill.completed{background:#2ca02c;}
+    .pill.paused{background:#ff7f0e;}
 
-    /* Data quality donut + table */
-    .dqWrap{
-      display:flex;
-      align-items:center;
-      gap:14px;
-      margin:10px 0 12px;
-      flex-wrap:wrap;
-    }
-    .dqCanvasBox{ width:150px; height:150px; flex:0 0 auto; }
-    #dq-legend{
-      font-size:12px;
-      color:var(--muted);
-      line-height:1.55;
-      min-width: 200px;
-    }
-    .legendRow{
-      display:flex;
-      align-items:center;
-      gap:8px;
-      margin:4px 0;
-    }
-    .dot{
-      width:10px;height:10px;border-radius:50%;
-      display:inline-block;
-    }
-    .dot.g{ background:var(--green); }
-    .dot.o{ background:var(--orange); }
-    .dot.r{ background:var(--red); }
-    .dot.n{ background:var(--grey); }
+    /* Woreda */
+    .controlsLine{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:8px 0 10px;flex-wrap:wrap;}
+    select{border:1px solid var(--border);border-radius:10px;padding:6px 10px;background:#fff;font-weight:900;}
+    .wScroll{max-height:min(32vh,360px);overflow:auto;padding-right:6px;}
+    table{width:100%;border-collapse:collapse;font-size:13px;}
+    thead th{text-align:left;font-size:12px;color:var(--muted);font-weight:900;padding:8px 0;border-bottom:1px solid #f0f0f2;}
+    tbody td{padding:9px 0;border-bottom:1px solid #f4f4f6;vertical-align:top;}
+    .wTable thead th:last-child,.wTable tbody td:last-child{text-align:right;padding-right:2px;}
+    .wRow{cursor:pointer;}
+    .wRow:hover{background:#fafafa;}
+    .wName{font-weight:950;}
+    .caret{display:inline-block;width:14px;text-align:center;color:#777;font-weight:900;}
 
-    table{
-      width:100%;
-      border-collapse:collapse;
-      font-size:13px;
-    }
-    thead th{
-      text-align:left;
-      font-size:12px;
-      color:var(--muted);
-      font-weight:900;
-      padding:8px 0;
-      border-bottom:1px solid #f0f0f2;
-    }
-    tbody td{
-      padding:9px 0;
-      border-bottom:1px solid #f4f4f6;
-      vertical-align:top;
-    }
-    .orgCell{
-      display:flex;
-      align-items:center;
-      gap:10px;
-      min-width:0;
-    }
-    .orgName{
-      font-weight:900;
-      white-space:nowrap;
-      overflow:hidden;
-      text-overflow:ellipsis;
-      max-width: 290px;
-    }
-    .small{
-      color:var(--muted);
-      font-weight:800;
-    }
-    .dateCell{
-      font-variant-numeric: tabular-nums;
-      font-weight:900;
-    }
+    .wExpand td{padding:10px 0 12px;border-bottom:1px solid #f0f0f2;background:#fcfcfd;}
+    .wPanel{border:1px solid #f0f0f2;border-radius:12px;padding:10px;margin:0;}
+    .wPanelHeader{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px;}
+    .wPanelHeader .ttl{font-weight:950;}
+    .wList{max-height:240px;overflow:auto;padding-right:6px;}
+    .wIt{border-top:1px dashed #ececf1;padding:8px 0;display:flex;gap:10px;align-items:flex-start;}
+    .wIt:first-child{border-top:none;padding-top:0;}
+    .wIt .left{min-width:0;}
+    .wIt .t1{font-weight:900;}
+    .wIt .t2{color:var(--muted);font-size:12px;margin-top:2px;}
+    .kvs{color:#333;font-size:12px;margin-top:3px;}
+    .kvs span{margin-right:10px;white-space:nowrap;display:inline-block;}
+    .pillMini{font-size:11px;font-weight:900;padding:2px 8px;border-radius:999px;color:#fff;line-height:16px;white-space:nowrap;margin-left:6px;}
 
-    /* Woreda coverage */
-    .controlsLine{
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:10px;
-      margin:8px 0 10px;
-      flex-wrap:wrap;
-    }
-    select{
-      border:1px solid var(--border);
-      border-radius:10px;
-      padding:6px 10px;
-      background:#fff;
-      font-weight:900;
-    }
-    .wScroll{ max-height: min(32vh, 360px); overflow:auto; padding-right:6px; }
+    /* Data quality */
+    .dqWrap{display:flex;align-items:center;gap:14px;margin:10px 0 12px;flex-wrap:wrap;}
+    .dqCanvasBox{width:150px;height:150px;flex:0 0 auto;}
+    #dq-legend{font-size:12px;color:var(--muted);line-height:1.55;min-width:220px;}
+    .legendRow{display:flex;align-items:center;gap:8px;margin:4px 0;}
+    .dot{width:10px;height:10px;border-radius:50%;display:inline-block;}
+    .dot.g{background:var(--green);} .dot.o{background:var(--orange);} .dot.r{background:var(--red);} .dot.n{background:var(--grey);}
+    .orgCell{display:flex;align-items:center;gap:10px;min-width:0;}
+    .orgName{font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:290px;}
+    .small{color:var(--muted);font-weight:800;}
+    .dateCell{font-variant-numeric:tabular-nums;font-weight:900;}
 
-    .wTable thead th:last-child,
-    .wTable tbody td:last-child{ text-align:right; padding-right:2px; }
-
-    .wRow{ cursor:pointer; }
-    .wRow:hover{ background:#fafafa; }
-    .wName{ font-weight:950; }
-    .caret{
-      display:inline-block;
-      width:14px;
-      text-align:center;
-      color:#777;
-      font-weight:900;
-    }
-
-    /* Expand panel for woreda */
-    .wExpand td{
-      padding:10px 0 12px;
-      border-bottom:1px solid #f0f0f2;
-      background:#fcfcfd;
-    }
-    .wPanel{
-      border:1px solid #f0f0f2;
-      border-radius:12px;
-      padding:10px 10px;
-      margin:0;
-    }
-    .wPanelHeader{
-      display:flex;
-      align-items:baseline;
-      justify-content:space-between;
-      gap:10px;
-      flex-wrap:wrap;
-      margin-bottom:8px;
-    }
-    .wPanelHeader .ttl{ font-weight:950; }
-    .wList{
-      max-height: 240px;
-      overflow:auto;
-      padding-right:6px;
-    }
-    .wIt{
-      border-top:1px dashed #ececf1;
-      padding:8px 0;
-      display:flex;
-      justify-content:space-between;
-      gap:10px;
-      align-items:flex-start;
-    }
-    .wIt:first-child{ border-top:none; padding-top:0; }
-    .wIt .left{ min-width:0; }
-    .wIt .t1{ font-weight:900; }
-    .wIt .t2{ color:var(--muted); font-size:12px; margin-top:2px; }
-    .kvs{ color:#333; font-size:12px; margin-top:3px; }
-    .kvs span{ margin-right:10px; white-space:nowrap; display:inline-block; }
-
-    .pillMini{
-      font-size:11px;
-      font-weight:900;
-      padding:2px 8px;
-      border-radius:999px;
-      color:#fff;
-      line-height:16px;
-      white-space:nowrap;
-      margin-left:6px;
-    }
-
-    /* Map preview (iframe) + overlay click */
-    .miniMapBox{
-      margin: 14px;
-      border:1px solid var(--border);
-      border-radius: 14px;
-      overflow:hidden;
-      box-shadow: var(--shadow);
-    }
-    .miniMapLink{ position:relative; }
-    .miniMapFrame{
-      width:100%;
-      height:220px;
-      border:0;
-      display:block;
-      background:#fff;
-    }
-    .miniMapOverlay{
-      position:absolute;
-      inset:0;
-      cursor:pointer;
-      background:transparent;
-    }
+    /* Map preview */
+    .miniMapBox{margin:14px;border:1px solid var(--border);border-radius:14px;overflow:hidden;box-shadow:var(--shadow);}
+    .miniMapLink{position:relative;}
+    .miniMapFrame{width:100%;height:220px;border:0;display:block;background:#fff;}
+    .miniMapOverlay{position:absolute;inset:0;cursor:pointer;background:transparent;}
     .miniMapHint{
-      position:absolute;
-      right:10px;
-      bottom:10px;
-      background:rgba(255,255,255,0.92);
-      border:1px solid var(--border);
-      border-radius:999px;
-      padding:4px 8px;
-      font-size:12px;
-      font-weight:900;
-      color:#333;
+      position:absolute;right:10px;bottom:10px;background:rgba(255,255,255,.92);
+      border:1px solid var(--border);border-radius:999px;padding:4px 8px;font-size:12px;font-weight:900;color:#333;
     }
 
-    /* Status bar */
     .statusbar{
-      margin-top:12px;
-      font-size:12px;
-      color:var(--muted);
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:12px;
-      flex-wrap:wrap;
+      margin-top:12px;font-size:12px;color:var(--muted);
+      display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;
     }
-    .err{
-      color:#b00020;
-      font-weight:900;
-    }
+    .err{color:#b00020;font-weight:900;}
   </style>
 </head>
 
@@ -407,11 +139,11 @@
   <div class="wrap">
     <div class="grid">
 
-      <!-- LEFT: Timeline + Woreda coverage -->
+      <!-- LEFT -->
       <div class="card">
         <div class="hd">
           <div class="title">Timeline (by month)</div>
-          <p class="sub">Grouped by <b>period_month</b>. Status filters apply to the timeline only.</p>
+          <p class="sub">Grouped by <b>period_month</b> (latest first). Status filters apply to the timeline only.</p>
         </div>
         <div class="bd">
           <div class="row">
@@ -444,10 +176,7 @@
           <div class="wScroll">
             <table class="wTable">
               <thead>
-                <tr>
-                  <th>Woreda</th>
-                  <th># interventions</th>
-                </tr>
+                <tr><th>Woreda</th><th># interventions</th></tr>
               </thead>
               <tbody id="woreda-body"></tbody>
             </table>
@@ -460,27 +189,21 @@
         </div>
       </div>
 
-      <!-- MIDDLE: Data quality -->
+      <!-- MIDDLE -->
       <div class="card">
         <div class="hd">
           <div class="title">Data quality — last org update</div>
-          <p class="sub">Latest <b>last_update</b> per org. Donut reflects this table (current dataset). Hover donut segments to see org names.</p>
+          <p class="sub">Latest <b>last_update</b> per organisation. Donut reflects this table. Hover segments to see org names.</p>
         </div>
         <div class="bd">
-
           <div class="dqWrap">
-            <div class="dqCanvasBox">
-              <canvas id="dq-donut"></canvas>
-            </div>
+            <div class="dqCanvasBox"><canvas id="dq-donut"></canvas></div>
             <div id="dq-legend"></div>
           </div>
 
           <table>
             <thead>
-              <tr>
-                <th>Organisation</th>
-                <th style="text-align:right;">Last update</th>
-              </tr>
+              <tr><th>Organisation</th><th style="text-align:right;">Last update</th></tr>
             </thead>
             <tbody id="dq-body"></tbody>
           </table>
@@ -492,7 +215,7 @@
         </div>
       </div>
 
-      <!-- RIGHT: Map preview -->
+      <!-- RIGHT -->
       <div class="card">
         <div class="hd">
           <div class="title">Map preview</div>
@@ -514,73 +237,21 @@
   // =========================
   // CONFIG
   // =========================
-  const INTERVENTIONS_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR_vGAsaVP8WM3PKX1SEcNSit7Ldh5SjwM9c-F01nmS-mDghFpNHcARtVDOzo1Qc7okT2be-Oi05msp/pub?output=csv";
-
-  // map page (your Leaflet page)
+  const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR_vGAsaVP8WM3PKX1SEcNSit7Ldh5SjwM9c-F01nmS-mDghFpNHcARtVDOzo1Qc7okT2be-Oi05msp/pub?output=csv";
   const MAP_URL = "./map.html";
-
-  // =========================
-  // CSV parsing
-  // =========================
-  function parseCSV(text) {
-    const rows = [];
-    let row = [];
-    let cell = '';
-    let inQuotes = false;
-
-    for (let i = 0; i < text.length; i++) {
-      const ch = text[i];
-      const next = text[i + 1];
-
-      if (ch === '"') {
-        if (inQuotes && next === '"') { cell += '"'; i++; }
-        else { inQuotes = !inQuotes; }
-      } else if (ch === ',' && !inQuotes) {
-        row.push(cell); cell = '';
-      } else if ((ch === '\n' || ch === '\r') && !inQuotes) {
-        if (ch === '\r' && next === '\n') i++;
-        row.push(cell);
-        rows.push(row);
-        row = [];
-        cell = '';
-      } else {
-        cell += ch;
-      }
-    }
-    if (cell.length || row.length) {
-      row.push(cell);
-      rows.push(row);
-    }
-    return rows;
-  }
-
-  function csvToObjects(csvText) {
-    const grid = parseCSV(csvText).filter(r => r.some(c => String(c).trim() !== ''));
-    if (!grid.length) return [];
-    const headers = grid[0].map(h => String(h).trim());
-    const out = [];
-    for (let i = 1; i < grid.length; i++) {
-      const r = grid[i];
-      const obj = {};
-      headers.forEach((h, j) => { obj[h] = (r[j] ?? '').toString().trim(); });
-      out.push(obj);
-    }
-    return out;
-  }
 
   // =========================
   // Helpers
   // =========================
-  function escapeHtml(str) {
+  const $ = (id) => document.getElementById(id);
+
+  function escapeHtml(str){
     return String(str ?? '')
-      .replace(/&/g,'&amp;')
-      .replace(/</g,'&lt;')
-      .replace(/>/g,'&gt;')
-      .replace(/"/g,'&quot;')
-      .replace(/'/g,'&#039;');
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;').replace(/'/g,'&#039;');
   }
 
-  function statusClass(status) {
+  function statusClass(status){
     const s = String(status || '').toLowerCase();
     if (s === 'planned') return 'planned';
     if (s === 'ongoing') return 'ongoing';
@@ -589,87 +260,83 @@
     return 'planned';
   }
 
-  function parseDateLoose(v) {
-    if (!v) return null;
-    if (v instanceof Date && !isNaN(v)) return v;
+  function parseDateLoose(v){
+    if(!v) return null;
+    if(v instanceof Date && !isNaN(v)) return v;
     const s = String(v).trim();
-    if (!s) return null;
-
+    if(!s) return null;
     const m = s.match(/^(\d{4})[-\/](\d{2})[-\/](\d{2})/);
-    if (m) {
-      const y = Number(m[1]), mo = Number(m[2]) - 1, d0 = Number(m[3]);
-      const d = new Date(y, mo, d0);
+    if(m){
+      const d = new Date(Number(m[1]), Number(m[2])-1, Number(m[3]));
       return isNaN(d) ? null : d;
     }
     const d = new Date(s);
     return isNaN(d) ? null : d;
   }
 
-  function freshnessFromLastUpdate(lastUpdate) {
+  function freshnessFromLastUpdate(lastUpdate){
     const d = parseDateLoose(lastUpdate);
-    if (!d) return { band: 'na', days: null };
-
+    if(!d) return { band:'na', days:null };
     const now = new Date();
-    let days = Math.floor((now - d) / (1000 * 60 * 60 * 24));
-    if (!isFinite(days)) return { band: 'na', days: null };
+    let days = Math.floor((now - d) / 86400000);
+    if(!isFinite(days)) return { band:'na', days:null };
+    if(days < 0) days = 0;
+    if(days <= 7) return { band:'green', days };
+    if(days <= 21) return { band:'orange', days };
+    return { band:'red', days };
+  }
 
-    // future dates -> treat as 0 day old (green)
-    if (days < 0) days = 0;
-
-    if (days <= 7)  return { band: 'green',  days };
-    if (days <= 21) return { band: 'orange', days };
-    return { band: 'red', days };
+  function getTimelineStatusFilterSet(){
+    const set = new Set();
+    if($('st-completed').checked) set.add('completed');
+    if($('st-ongoing').checked) set.add('ongoing');
+    if($('st-planned').checked) set.add('planned');
+    if($('st-paused').checked) set.add('paused');
+    return set;
   }
 
   // =========================
   // State
   // =========================
   let rows = [];
-  let dqChart = null;
-  let dqBandToOrgs = { green: [], orange: [], red: [], na: [] };
   let expandedWoredaKey = null;
+  let dqChart = null;
+  let dqBandToOrgs = { green:[], orange:[], red:[], na:[] };
 
   // =========================
-  // Timeline
+  // Render: Timeline
   // =========================
-  function getTimelineStatusFilterSet() {
-    const set = new Set();
-    if (document.getElementById('st-completed').checked) set.add('completed');
-    if (document.getElementById('st-ongoing').checked) set.add('ongoing');
-    if (document.getElementById('st-planned').checked) set.add('planned');
-    if (document.getElementById('st-paused').checked) set.add('paused');
-    return set;
-  }
-
-  function renderTimeline() {
-    const container = document.getElementById('timeline');
+  function renderTimeline(){
+    const container = $('timeline');
     container.innerHTML = '';
 
     const allowed = getTimelineStatusFilterSet();
-
-    const filtered = rows.filter(r => allowed.has(String(r.status || '').toLowerCase()));
+    const filtered = rows.filter(r => allowed.has(String(r.status||'').toLowerCase()));
 
     const byMonth = new Map();
-    for (const r of filtered) {
+    for(const r of filtered){
       const m = (r.period_month || '').trim() || 'Unknown';
-      if (!byMonth.has(m)) byMonth.set(m, []);
+      if(!byMonth.has(m)) byMonth.set(m, []);
       byMonth.get(m).push(r);
     }
 
-    const months = [...byMonth.keys()].sort((a,b) => b.localeCompare(a));
-
+    const months = [...byMonth.keys()].sort((a,b)=> b.localeCompare(a));
     let totalShown = 0;
 
-    for (const m of months) {
+    for(const m of months){
       const list = byMonth.get(m) || [];
-      list.sort((a,b) => (a.org_name || '').localeCompare(b.org_name || '') || (a.woreda || '').localeCompare(b.woreda || ''));
+      list.sort((a,b)=>
+        (a.org_name||'').localeCompare(b.org_name||'') ||
+        (a.woreda||'').localeCompare(b.woreda||'') ||
+        (a.site_name||'').localeCompare(b.site_name||'')
+      );
 
       const hdr = document.createElement('div');
       hdr.className = 'monthHdr';
       hdr.textContent = m;
       container.appendChild(hdr);
 
-      for (const r of list) {
+      for(const r of list){
         totalShown++;
 
         const org = r.org_name || 'Unknown org';
@@ -692,32 +359,32 @@
       }
     }
 
-    document.getElementById('tl-count').textContent = String(totalShown);
+    $('tl-count').textContent = String(totalShown);
   }
 
   // =========================
-  // Woreda coverage + expand
+  // Woreda (table + expand panel)
   // =========================
-  function getWoredaFilteredRows() {
-    const month = document.getElementById('w-month').value;
-    return rows.filter(r => month ? (r.period_month || '').trim() === month : true);
+  function getWoredaFilteredRows(){
+    const month = $('w-month').value;
+    return rows.filter(r => month ? (r.period_month||'').trim() === month : true);
   }
 
-  function renderWoredaPanelHtml(woreda) {
-    const month = document.getElementById('w-month').value;
-    const filtered = getWoredaFilteredRows().filter(r => ((r.woreda || '').trim() || 'Unknown') === woreda);
+  function renderWoredaPanelHtml(woreda){
+    const month = $('w-month').value;
+    const filtered = getWoredaFilteredRows().filter(r => ((r.woreda||'').trim()||'Unknown') === woreda);
 
-    filtered.sort((a,b) =>
-      (a.org_name || '').localeCompare(b.org_name || '') ||
-      (a.site_name || '').localeCompare(b.site_name || '')
+    filtered.sort((a,b)=>
+      (a.org_name||'').localeCompare(b.org_name||'') ||
+      (a.site_name||'').localeCompare(b.site_name||'')
     );
 
     const titleMonth = month ? `(${escapeHtml(month)})` : '(All months)';
 
-    const itemsHtml = filtered.map(r => {
+    const itemsHtml = filtered.map(r=>{
       const org = r.org_name || 'Unknown';
       const site = r.site_name || '-';
-      const status = String(r.status || '').toLowerCase() || '-';
+      const status = String(r.status||'').toLowerCase() || '-';
       const stClass = statusClass(status);
 
       const pm = r.period_month || '—';
@@ -747,21 +414,21 @@
             </div>
 
             <div class="kvs">
-              <span><b>Zone:</b> ${escapeHtml(zone || '—')}</span>
+              <span><b>Zone:</b> ${escapeHtml(zone||'—')}</span>
               <span><b>Month:</b> ${escapeHtml(pm)}</span>
               <span><b>Last update:</b> ${escapeHtml(lu)}</span>
-              <span><b>Planned:</b> ${escapeHtml(planned || '—')}</span>
-              <span><b>Reached:</b> ${escapeHtml(reached || '—')}</span>
+              <span><b>Planned:</b> ${escapeHtml(planned||'—')}</span>
+              <span><b>Reached:</b> ${escapeHtml(reached||'—')}</span>
             </div>
 
             <div class="kvs">
-              <span><b>Commodities:</b> ${escapeHtml(comm || '—')}</span>
-              <span><b>Next action:</b> ${escapeHtml(next || '—')}</span>
+              <span><b>Commodities:</b> ${escapeHtml(comm||'—')}</span>
+              <span><b>Next action:</b> ${escapeHtml(next||'—')}</span>
             </div>
 
             <div class="kvs">
-              <span><b>Contact:</b> ${escapeHtml(cName || '—')}</span>
-              <span><b>Email:</b> ${escapeHtml(cEmail || '—')}</span>
+              <span><b>Contact:</b> ${escapeHtml(cName||'—')}</span>
+              <span><b>Email:</b> ${escapeHtml(cEmail||'—')}</span>
             </div>
           </div>
         </div>
@@ -783,23 +450,23 @@
     `;
   }
 
-  function renderWoredaTable() {
+  function renderWoredaTable(){
     const filtered = getWoredaFilteredRows();
-
     const counts = new Map();
-    for (const r of filtered) {
-      const w = (r.woreda || '').trim() || 'Unknown';
-      counts.set(w, (counts.get(w) || 0) + 1);
+
+    for(const r of filtered){
+      const w = (r.woreda||'').trim() || 'Unknown';
+      counts.set(w, (counts.get(w)||0) + 1);
     }
 
     const items = [...counts.entries()]
-      .map(([w, n]) => ({ w, n }))
-      .sort((a,b) => b.n - a.n || a.w.localeCompare(b.w));
+      .map(([w,n])=>({w,n}))
+      .sort((a,b)=> b.n - a.n || a.w.localeCompare(b.w));
 
-    const body = document.getElementById('woreda-body');
+    const body = $('woreda-body');
     body.innerHTML = '';
 
-    for (const it of items) {
+    for(const it of items){
       const woredaKey = it.w;
 
       const tr = document.createElement('tr');
@@ -814,7 +481,7 @@
       `;
       body.appendChild(tr);
 
-      if (expandedWoredaKey === woredaKey) {
+      if(expandedWoredaKey === woredaKey){
         const expand = document.createElement('tr');
         expand.className = 'wExpand';
         expand.innerHTML = `<td colspan="2">${renderWoredaPanelHtml(woredaKey)}</td>`;
@@ -822,96 +489,84 @@
       }
     }
 
-    document.getElementById('w-count').textContent = String(items.length);
+    $('w-count').textContent = String(items.length);
 
-    // bind click
-    body.querySelectorAll('.wRow').forEach(rowEl => {
-      rowEl.addEventListener('click', () => {
-        const w = rowEl.dataset.woreda;
+    body.querySelectorAll('.wRow').forEach(el=>{
+      el.addEventListener('click', ()=>{
+        const w = el.dataset.woreda;
         expandedWoredaKey = (expandedWoredaKey === w) ? null : w;
         renderWoredaTable();
       });
     });
   }
 
-  function populateMonthDropdown() {
-    const sel = document.getElementById('w-month');
-    const existing = new Set([...sel.options].map(o => o.value));
-    const months = [...new Set(rows.map(r => (r.period_month || '').trim()).filter(Boolean))].sort((a,b)=> b.localeCompare(a));
-    for (const m of months) {
-      if (existing.has(m)) continue;
+  function populateMonthDropdown(){
+    const sel = $('w-month');
+    const existing = new Set([...sel.options].map(o=>o.value));
+    const months = [...new Set(rows.map(r => (r.period_month||'').trim()).filter(Boolean))]
+      .sort((a,b)=> b.localeCompare(a));
+    for(const m of months){
+      if(existing.has(m)) continue;
       const opt = document.createElement('option');
-      opt.value = m;
-      opt.textContent = m;
+      opt.value = m; opt.textContent = m;
       sel.appendChild(opt);
     }
   }
 
   // =========================
-  // Data quality (donut + table)
+  // Data Quality
   // =========================
-  function computeDataQuality() {
-    const latest = new Map(); // org -> {dateObj, dateStr}
-    const counts = new Map(); // org -> nb records
+  function computeDataQuality(){
+    const latest = new Map(); // org -> bestDateObj + string
+    const counts = new Map();
 
-    for (const r of rows) {
-      const org = (r.org_name || '').trim() || 'Unknown';
-      counts.set(org, (counts.get(org) || 0) + 1);
+    for(const r of rows){
+      const org = (r.org_name||'').trim() || 'Unknown';
+      counts.set(org, (counts.get(org)||0) + 1);
 
       const d = parseDateLoose(r.last_update);
       const prev = latest.get(org) || null;
-      if (!prev) {
-        latest.set(org, { dateObj: d, dateStr: (r.last_update || '').trim() });
+
+      if(!prev){
+        latest.set(org, { dateObj: d, dateStr: (r.last_update||'').trim() });
       } else {
-        // keep latest parsable date; if unparsable, keep existing
-        if (d && (!prev.dateObj || d > prev.dateObj)) {
-          latest.set(org, { dateObj: d, dateStr: (r.last_update || '').trim() });
-        } else if (!prev.dateObj && (r.last_update || '').trim()) {
-          // still no parsable date, keep some string
-          latest.set(org, { dateObj: null, dateStr: prev.dateStr || (r.last_update || '').trim() });
+        if(d && (!prev.dateObj || d > prev.dateObj)){
+          latest.set(org, { dateObj: d, dateStr: (r.last_update||'').trim() });
+        } else if(!prev.dateObj && (r.last_update||'').trim()){
+          latest.set(org, { dateObj: null, dateStr: prev.dateStr || (r.last_update||'').trim() });
         }
       }
     }
 
-    const orgRows = [];
-    dqBandToOrgs = { green: [], orange: [], red: [], na: [] };
+    dqBandToOrgs = { green:[], orange:[], red:[], na:[] };
 
-    for (const [org, info] of latest.entries()) {
-      const fr = freshnessFromLastUpdate(info.dateObj || info.dateStr);
-      orgRows.push({
-        org,
-        count: counts.get(org) || 0,
-        last_update: info.dateStr || '',
-        fr
-      });
+    const orgRows = [];
+    for(const [org, info] of latest.entries()){
+      const fr = freshnessFromLastUpdate(info.dateStr);
+      orgRows.push({ org, count: counts.get(org)||0, last_update: info.dateStr || '', fr });
       dqBandToOrgs[fr.band].push(org);
     }
 
-    const rank = (band) => band === 'red' ? 3 : band === 'orange' ? 2 : band === 'green' ? 1 : 0;
-    orgRows.sort((a,b) => {
+    Object.keys(dqBandToOrgs).forEach(k => dqBandToOrgs[k].sort((a,b)=>a.localeCompare(b)));
+
+    const rank = (band) => band==='red'?3:band==='orange'?2:band==='green'?1:0;
+    orgRows.sort((a,b)=>{
       const ra = rank(a.fr.band), rb = rank(b.fr.band);
-      if (rb !== ra) return rb - ra;
+      if(rb !== ra) return rb - ra;
       return a.org.localeCompare(b.org);
     });
-
-    // sort org lists for tooltip cleanliness
-    Object.keys(dqBandToOrgs).forEach(k => dqBandToOrgs[k].sort((a,b)=>a.localeCompare(b)));
 
     return orgRows;
   }
 
-  function renderDataQuality() {
+  function renderDataQuality(){
     const orgRows = computeDataQuality();
 
-    const greenOrgs = dqBandToOrgs.green || [];
-    const orangeOrgs = dqBandToOrgs.orange || [];
-    const redOrgs = dqBandToOrgs.red || [];
-    const naOrgs = dqBandToOrgs.na || [];
+    const greenOrgs = dqBandToOrgs.green, orangeOrgs = dqBandToOrgs.orange, redOrgs = dqBandToOrgs.red, naOrgs = dqBandToOrgs.na;
+    const g=greenOrgs.length, o=orangeOrgs.length, r=redOrgs.length, n=naOrgs.length;
+    const total = g+o+r+n;
 
-    const g = greenOrgs.length, o = orangeOrgs.length, r = redOrgs.length, n = naOrgs.length;
-    const total = g + o + r + n;
-
-    document.getElementById('dq-legend').innerHTML = `
+    $('dq-legend').innerHTML = `
       <div class="legendRow"><span class="dot g"></span> ≤7 days: <b>${g}</b></div>
       <div class="legendRow"><span class="dot o"></span> 8–21 days: <b>${o}</b></div>
       <div class="legendRow"><span class="dot r"></span> >21 days: <b>${r}</b></div>
@@ -919,12 +574,12 @@
       <div style="margin-top:6px;"><span class="small">Total orgs:</span> <b>${total}</b></div>
     `;
 
-    const body = document.getElementById('dq-body');
+    const body = $('dq-body');
     body.innerHTML = '';
-    for (const it of orgRows) {
+    for(const it of orgRows){
       const band = it.fr.band;
-      const dotClass = band === 'green' ? 'g' : band === 'orange' ? 'o' : band === 'red' ? 'r' : 'n';
-      const title = band === 'na' ? 'No valid last_update' : `${it.fr.days} day(s) old`;
+      const dotClass = band==='green'?'g':band==='orange'?'o':band==='red'?'r':'n';
+      const title = band==='na' ? 'No valid last_update' : `${it.fr.days} day(s) old`;
 
       const tr = document.createElement('tr');
       tr.innerHTML = `
@@ -935,65 +590,43 @@
             <span class="small">(${it.count})</span>
           </div>
         </td>
-        <td class="dateCell" style="text-align:right;">
-          ${escapeHtml(it.last_update || '—')}
-        </td>
+        <td class="dateCell" style="text-align:right;">${escapeHtml(it.last_update || '—')}</td>
       `;
       body.appendChild(tr);
     }
 
-    document.getElementById('dq-summary').textContent = total ? `${total} organisations tracked` : 'No organisations';
+    $('dq-summary').textContent = total ? `${total} organisations tracked` : 'No organisations';
 
     // Donut
-    const ctx = document.getElementById('dq-donut').getContext('2d');
-
-    const labels = ['≤7 days', '8–21 days', '>21 days', 'n/a'];
-    const data = [g, o, r, n];
-
+    const ctx = $('dq-donut').getContext('2d');
+    const labels = ['≤7 days','8–21 days','>21 days','n/a'];
+    const data = [g,o,r,n];
     const colors = [
       getComputedStyle(document.documentElement).getPropertyValue('--green').trim(),
       getComputedStyle(document.documentElement).getPropertyValue('--orange').trim(),
       getComputedStyle(document.documentElement).getPropertyValue('--red').trim(),
       getComputedStyle(document.documentElement).getPropertyValue('--grey').trim()
     ];
-
     const bandOrgs = [greenOrgs, orangeOrgs, redOrgs, naOrgs];
 
-    if (dqChart) dqChart.destroy();
-
+    if(dqChart) dqChart.destroy();
     dqChart = new Chart(ctx, {
-      type: 'doughnut',
-      data: {
-        labels,
-        datasets: [{
-          data,
-          backgroundColor: colors,
-          borderWidth: 0
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        cutout: '68%',
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              title: (items) => {
-                const i = items[0].dataIndex;
-                return `${labels[i]} — ${data[i]} org(s)`;
-              },
-              label: (item) => {
-                const i = item.dataIndex;
-                const orgs = bandOrgs[i] || [];
-                if (!orgs.length) return '—';
-
-                // keep readable
+      type:'doughnut',
+      data:{ labels, datasets:[{ data, backgroundColor:colors, borderWidth:0 }] },
+      options:{
+        responsive:true, maintainAspectRatio:false, cutout:'68%',
+        plugins:{
+          legend:{display:false},
+          tooltip:{
+            callbacks:{
+              title:(items)=>`${labels[items[0].dataIndex]} — ${data[items[0].dataIndex]} org(s)`,
+              label:(item)=>{
+                const orgs = bandOrgs[item.dataIndex] || [];
+                if(!orgs.length) return '—';
                 const max = 18;
-                const shown = orgs.slice(0, max);
+                const shown = orgs.slice(0,max);
                 const rest = orgs.length - shown.length;
-                const line = shown.join(', ');
-                return rest > 0 ? `${line} … (+${rest})` : line;
+                return rest>0 ? `${shown.join(', ')} … (+${rest})` : shown.join(', ');
               }
             }
           }
@@ -1005,74 +638,83 @@
   // =========================
   // Events
   // =========================
-  function wireEvents() {
-    ['st-completed','st-ongoing','st-planned','st-paused'].forEach(id => {
-      document.getElementById(id).addEventListener('change', renderTimeline);
+  function wireEvents(){
+    ['st-completed','st-ongoing','st-planned','st-paused'].forEach(id=>{
+      $(id).addEventListener('change', renderTimeline);
     });
-
-    document.getElementById('w-month').addEventListener('change', () => {
-      expandedWoredaKey = null; // reset open panel on month change
+    $('w-month').addEventListener('change', ()=>{
+      expandedWoredaKey = null;
       renderWoredaTable();
     });
   }
 
   // =========================
-  // Load
+  // Load (PapaParse)
   // =========================
-  async function main() {
+  function normalizeRow(r){
+    // Align on your exact headers:
+    return {
+      org_name: (r.org_name || '').trim(),
+      cluster: (r.cluster || '').trim(),
+      intervention_type: (r.intervention_type || '').trim(),
+      zone: (r.zone || '').trim(),
+      woreda: (r.woreda || '').trim(),
+      site_name: (r.site_name || '').trim(),
+      site_type: (r.site_type || '').trim(),
+      latitude: (r.latitude || '').trim(),
+      longitude: (r.longitude || '').trim(),
+      period_month: (r.period_month || '').trim(),
+      status: (r.status || '').trim(),
+      beneficiaries_planned: (r.beneficiaries_planned || '').trim(),
+      beneficiaries_reached_to_date: (r.beneficiaries_reached_to_date || '').trim(),
+      commodities: (r.commodities || '').trim(),
+      last_update: (r.last_update || '').trim(),
+      next_action: (r.next_action || '').trim(),
+      contact_name: (r.contact_name || '').trim(),
+      contact_email: (r.contact_email || '').trim()
+    };
+  }
+
+  function main(){
     // Wire map links
-    document.getElementById('btn-open-map').setAttribute('href', MAP_URL);
-    document.getElementById('miniMapFrame').setAttribute('src', MAP_URL);
-    document.getElementById('miniMapOverlay').setAttribute('href', MAP_URL);
+    $('btn-open-map').href = MAP_URL;
+    $('miniMapFrame').src = MAP_URL;
+    $('miniMapOverlay').href = MAP_URL;
 
-    const statusEl = document.getElementById('load-status');
+    const statusEl = $('load-status');
+    statusEl.textContent = 'Loading CSV…';
 
-    try {
-      statusEl.textContent = 'Loading CSV…';
-      const resp = await fetch(INTERVENTIONS_URL);
-      if (!resp.ok) throw new Error(`CSV fetch failed: ${resp.status}`);
-      const csvText = await resp.text();
+    Papa.parse(CSV_URL, {
+      download: true,
+      header: true,
+      skipEmptyLines: true,
+      dynamicTyping: false,
+      complete: function(res){
+        try{
+          if(res.errors && res.errors.length){
+            console.warn('PapaParse errors:', res.errors);
+          }
+          rows = (res.data || []).map(normalizeRow);
 
-      rows = csvToObjects(csvText);
-
-      // Normalize/ensure the exact expected headers exist (your sheet already uses these)
-      rows = rows.map(r => ({
-        org_name: (r.org_name || '').trim(),
-        cluster: (r.cluster || '').trim(),
-        intervention_type: (r.intervention_type || '').trim(),
-        zone: (r.zone || '').trim(),
-        woreda: (r.woreda || '').trim(),
-        site_name: (r.site_name || '').trim(),
-        site_type: (r.site_type || '').trim(),
-        latitude: (r.latitude || '').trim(),
-        longitude: (r.longitude || '').trim(),
-        period_month: (r.period_month || '').trim(),
-        status: (r.status || '').trim(),
-        beneficiaries_planned: (r.beneficiaries_planned || '').trim(),
-        beneficiaries_reached_to_date: (r.beneficiaries_reached_to_date || '').trim(),
-        commodities: (r.commodities || '').trim(),
-        last_update: (r.last_update || '').trim(),
-        next_action: (r.next_action || '').trim(),
-        contact_name: (r.contact_name || '').trim(),
-        contact_email: (r.contact_email || '').trim()
-      }));
-
-      statusEl.textContent = `Loaded ${rows.length} records`;
-
-      populateMonthDropdown();
-      renderTimeline();
-      renderWoredaTable();
-      renderDataQuality();
-      wireEvents();
-
-    } catch (e) {
-      statusEl.innerHTML = `<span class="err">Error:</span> ${escapeHtml(e.message || String(e))}`;
-      console.error(e);
-    }
+          statusEl.textContent = `Loaded ${rows.length} records`;
+          populateMonthDropdown();
+          renderTimeline();
+          renderWoredaTable();
+          renderDataQuality();
+          wireEvents();
+        } catch(e){
+          statusEl.innerHTML = `<span class="err">Error:</span> ${escapeHtml(e.message || String(e))}`;
+          console.error(e);
+        }
+      },
+      error: function(err){
+        statusEl.innerHTML = `<span class="err">Error:</span> ${escapeHtml(err?.message || String(err))}`;
+        console.error(err);
+      }
+    });
   }
 
   main();
 </script>
-
 </body>
 </html>
