@@ -1,296 +1,441 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<title>Coordination Dashboard — Benishangul-Gumuz (Nutrition)</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="utf-8" />
+  <title>Coordination Dashboard — Benishangul-Gumuz (Nutrition)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <!-- Chart.js for donut -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 
-<style>
-:root{
-  --bg:#f6f7f9;
-  --card:#ffffff;
-  --text:#111;
-  --muted:#666;
-  --border:#e7e7ea;
+  <style>
+    :root{
+      --bg:#f6f7f9;
+      --card:#ffffff;
+      --text:#111;
+      --muted:#666;
+      --border:#e7e7ea;
 
-  --green:#2ca02c;
-  --orange:#ff7f0e;
-  --red:#d62728;
-  --grey:#bdbdbd;
+      --green:#2ca02c;
+      --orange:#ff7f0e;
+      --red:#d62728;
+      --grey:#bdbdbd;
 
-  --shadow: 0 10px 22px rgba(0,0,0,0.07);
-  --radius:14px;
-}
+      --shadow: 0 10px 22px rgba(0,0,0,0.07);
+      --radius:14px;
+    }
 
-html,body{
-  margin:0;
-  background:var(--bg);
-  font-family:system-ui, -apple-system, Segoe UI, Roboto, Arial;
-  color:var(--text);
-}
+    html, body { height:100%; margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial; color:var(--text); background:var(--bg); }
 
-.topbar{
-  height:56px;
-  background:#fff;
-  border-bottom:1px solid var(--border);
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  padding:0 18px;
-}
+    /* Top bar */
+    .topbar{
+      height:56px;
+      background:#fff;
+      border-bottom:1px solid var(--border);
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      padding:0 18px;
+      position:sticky;
+      top:0;
+      z-index:5;
+    }
+    .topbar h1{
+      font-size: clamp(14px, 1.2vw, 16px);
+      margin:0;
+      font-weight:900;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      max-width: 70vw;
+    }
+    .actions{
+      display:flex;
+      align-items:center;
+      gap:10px;
+    }
+    .btn{
+      border:1px solid var(--border);
+      background:#fff;
+      padding:8px 10px;
+      border-radius:10px;
+      font-weight:900;
+      cursor:pointer;
+      font-size:13px;
+      text-decoration:none;
+      color:inherit;
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+    }
+    .btn:hover{ background:#fafafa; }
+    .btn[disabled]{ opacity:0.55; cursor:not-allowed; }
 
-.topbar h1{
-  font-size:15px;
-  font-weight:900;
-  margin:0;
-}
+    /* Layout */
+    .wrap{
+      padding:14px 18px 22px;
+      max-width: 1500px;
+      margin: 0 auto;
+    }
+    .grid{
+      display:grid;
+      grid-template-columns: 1.25fr 0.95fr 0.65fr;
+      gap:14px;
+      align-items:start;
+    }
+    @media (max-width: 1280px){
+      .grid{ grid-template-columns: 1fr 1fr; }
+      .grid > :nth-child(3){ grid-column: 1 / -1; }
+    }
+    @media (max-width: 820px){
+      .grid{ grid-template-columns: 1fr; }
+    }
 
-.actions{ display:flex; gap:10px; }
+    /* Cards */
+    .card{
+      background:var(--card);
+      border:1px solid var(--border);
+      border-radius:var(--radius);
+      box-shadow: var(--shadow);
+      overflow:hidden;
+    }
+    .card .hd{
+      padding:14px 14px 10px;
+      border-bottom:1px solid var(--border);
+    }
+    .card .hd .title{
+      font-weight:900;
+      font-size: clamp(13px, 1.1vw, 14px);
+      margin:0 0 6px 0;
+    }
+    .card .hd .sub{
+      margin:0;
+      color:var(--muted);
+      font-size:12px;
+      line-height:1.35;
+    }
+    .card .bd{ padding:12px 14px 14px; }
 
-.btn{
-  border:1px solid var(--border);
-  padding:7px 10px;
-  border-radius:10px;
-  font-weight:900;
-  font-size:13px;
-  text-decoration:none;
-  color:inherit;
-  background:#fff;
-}
+    /* Timeline */
+    .row{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      flex-wrap:wrap;
+    }
+    .chips{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      align-items:center;
+    }
+    .chip{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      font-size:12px;
+      color:#222;
+      user-select:none;
+    }
+    .chip input{ transform: translateY(1px); }
+    .muted{ color:var(--muted); }
+    .count{ font-weight:900; color:#333; font-variant-numeric: tabular-nums; }
 
-.wrap{
-  max-width:1500px;
-  margin:0 auto;
-  padding:18px;
-}
+    .scroll{
+      max-height: min(52vh, 560px);
+      overflow:auto;
+      padding-right:6px;
+    }
+    .monthHdr{
+      font-weight:950;
+      font-size:18px;
+      margin:12px 0 8px;
+    }
+    .item{
+      border-top:1px solid #f0f0f2;
+      padding:10px 0;
+      display:flex;
+      justify-content:space-between;
+      gap:12px;
+      align-items:flex-start;
+    }
+    .item .left{ min-width:0; }
+    .org{
+      font-weight:900;
+      font-size: clamp(13px, 1.1vw, 14px);
+      margin-bottom:3px;
+      display:flex;
+      align-items:center;
+      gap:8px;
+      flex-wrap:wrap;
+    }
+    .line{
+      font-size:13px;
+      color:#333;
+    }
+    .pill{
+      font-size:12px;
+      font-weight:900;
+      padding:2px 10px;
+      border-radius:999px;
+      color:#fff;
+      white-space:nowrap;
+      line-height:18px;
+    }
+    .pill.planned{ background:#808080; }
+    .pill.ongoing{ background:#1f77b4; }
+    .pill.completed{ background:#2ca02c; }
+    .pill.paused{ background:#ff7f0e; }
 
-.grid{
-  display:grid;
-  grid-template-columns: 1.25fr 0.95fr 0.65fr;
-  gap:14px;
-}
+    /* Data quality donut + table */
+    .dqWrap{
+      display:flex;
+      align-items:center;
+      gap:14px;
+      margin:10px 0 12px;
+      flex-wrap:wrap;
+    }
+    .dqCanvasBox{ width:150px; height:150px; flex:0 0 auto; }
+    #dq-legend{
+      font-size:12px;
+      color:var(--muted);
+      line-height:1.55;
+      min-width: 200px;
+    }
+    .legendRow{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      margin:4px 0;
+    }
+    .dot{
+      width:10px;height:10px;border-radius:50%;
+      display:inline-block;
+    }
+    .dot.g{ background:var(--green); }
+    .dot.o{ background:var(--orange); }
+    .dot.r{ background:var(--red); }
+    .dot.n{ background:var(--grey); }
 
-@media(max-width:1280px){
-  .grid{ grid-template-columns:1fr 1fr; }
-  .grid > :nth-child(3){ grid-column:1/-1; }
-}
+    table{
+      width:100%;
+      border-collapse:collapse;
+      font-size:13px;
+    }
+    thead th{
+      text-align:left;
+      font-size:12px;
+      color:var(--muted);
+      font-weight:900;
+      padding:8px 0;
+      border-bottom:1px solid #f0f0f2;
+    }
+    tbody td{
+      padding:9px 0;
+      border-bottom:1px solid #f4f4f6;
+      vertical-align:top;
+    }
+    .orgCell{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      min-width:0;
+    }
+    .orgName{
+      font-weight:900;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      max-width: 290px;
+    }
+    .small{
+      color:var(--muted);
+      font-weight:800;
+    }
+    .dateCell{
+      font-variant-numeric: tabular-nums;
+      font-weight:900;
+    }
 
-@media(max-width:820px){
-  .grid{ grid-template-columns:1fr; }
-}
+    /* Woreda coverage */
+    .controlsLine{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      margin:8px 0 10px;
+      flex-wrap:wrap;
+    }
+    select{
+      border:1px solid var(--border);
+      border-radius:10px;
+      padding:6px 10px;
+      background:#fff;
+      font-weight:900;
+    }
+    .wScroll{ max-height: min(32vh, 360px); overflow:auto; padding-right:6px; }
 
-.card{
-  background:#fff;
-  border:1px solid var(--border);
-  border-radius:var(--radius);
-  box-shadow:var(--shadow);
-  overflow:hidden;
-}
+    .wTable thead th:last-child,
+    .wTable tbody td:last-child{ text-align:right; padding-right:2px; }
 
-.card .hd{
-  padding:14px;
-  border-bottom:1px solid var(--border);
-}
+    .wRow{ cursor:pointer; }
+    .wRow:hover{ background:#fafafa; }
+    .wName{ font-weight:950; }
+    .caret{
+      display:inline-block;
+      width:14px;
+      text-align:center;
+      color:#777;
+      font-weight:900;
+    }
 
-.card .hd .title{
-  font-weight:900;
-  font-size:14px;
-  margin-bottom:4px;
-}
+    /* Expand panel for woreda */
+    .wExpand td{
+      padding:10px 0 12px;
+      border-bottom:1px solid #f0f0f2;
+      background:#fcfcfd;
+    }
+    .wPanel{
+      border:1px solid #f0f0f2;
+      border-radius:12px;
+      padding:10px 10px;
+      margin:0;
+    }
+    .wPanelHeader{
+      display:flex;
+      align-items:baseline;
+      justify-content:space-between;
+      gap:10px;
+      flex-wrap:wrap;
+      margin-bottom:8px;
+    }
+    .wPanelHeader .ttl{ font-weight:950; }
+    .wList{
+      max-height: 240px;
+      overflow:auto;
+      padding-right:6px;
+    }
+    .wIt{
+      border-top:1px dashed #ececf1;
+      padding:8px 0;
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+      align-items:flex-start;
+    }
+    .wIt:first-child{ border-top:none; padding-top:0; }
+    .wIt .left{ min-width:0; }
+    .wIt .t1{ font-weight:900; }
+    .wIt .t2{ color:var(--muted); font-size:12px; margin-top:2px; }
+    .kvs{ color:#333; font-size:12px; margin-top:3px; }
+    .kvs span{ margin-right:10px; white-space:nowrap; display:inline-block; }
 
-.card .bd{ padding:14px; }
+    .pillMini{
+      font-size:11px;
+      font-weight:900;
+      padding:2px 8px;
+      border-radius:999px;
+      color:#fff;
+      line-height:16px;
+      white-space:nowrap;
+      margin-left:6px;
+    }
 
-.scroll{ max-height:52vh; overflow:auto; }
+    /* Map preview (iframe) + overlay click */
+    .miniMapBox{
+      margin: 14px;
+      border:1px solid var(--border);
+      border-radius: 14px;
+      overflow:hidden;
+      box-shadow: var(--shadow);
+    }
+    .miniMapLink{ position:relative; }
+    .miniMapFrame{
+      width:100%;
+      height:220px;
+      border:0;
+      display:block;
+      background:#fff;
+    }
+    .miniMapOverlay{
+      position:absolute;
+      inset:0;
+      cursor:pointer;
+      background:transparent;
+    }
+    .miniMapHint{
+      position:absolute;
+      right:10px;
+      bottom:10px;
+      background:rgba(255,255,255,0.92);
+      border:1px solid var(--border);
+      border-radius:999px;
+      padding:4px 8px;
+      font-size:12px;
+      font-weight:900;
+      color:#333;
+    }
 
-.pill{
-  font-size:11px;
-  font-weight:900;
-  padding:2px 8px;
-  border-radius:999px;
-  color:#fff;
-}
-
-.pill.planned{background:#808080;}
-.pill.ongoing{background:#1f77b4;}
-.pill.completed{background:#2ca02c;}
-.pill.paused{background:#ff7f0e;}
-
-.wRow{ cursor:pointer; }
-.wRow:hover{ background:#fafafa; }
-
-.miniMapBox{ position:relative; margin:14px; }
-.miniMapFrame{ width:100%; height:220px; border:0; }
-.miniMapOverlay{ position:absolute; inset:0; cursor:pointer; }
-.miniMapHint{
-  position:absolute;
-  bottom:10px; right:10px;
-  background:#fff;
-  padding:4px 8px;
-  border-radius:999px;
-  font-size:12px;
-  font-weight:900;
-  border:1px solid var(--border);
-}
-
-.dot{ width:10px;height:10px;border-radius:50%;display:inline-block; }
-.dot.g{background:var(--green);}
-.dot.o{background:var(--orange);}
-.dot.r{background:var(--red);}
-.dot.n{background:var(--grey);}
-</style>
+    /* Status bar */
+    .statusbar{
+      margin-top:12px;
+      font-size:12px;
+      color:var(--muted);
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      flex-wrap:wrap;
+    }
+    .err{
+      color:#b00020;
+      font-weight:900;
+    }
+  </style>
 </head>
 
 <body>
-
-<div class="topbar">
-  <h1>Coordination Dashboard — Benishangul-Gumuz</h1>
-  <div class="actions">
-    <a class="btn" href="./map.html" target="_blank">Open full map</a>
-  </div>
-</div>
-
-<div class="wrap">
-<div class="grid">
-
-<!-- LEFT -->
-<div class="card">
-  <div class="hd">
-    <div class="title">Woreda Coverage</div>
-  </div>
-  <div class="bd">
-    <select id="w-month"><option value="">All months</option></select>
-    <div class="scroll">
-      <table width="100%">
-        <thead>
-          <tr><th>Woreda</th><th align="right">#</th></tr>
-        </thead>
-        <tbody id="woreda-body"></tbody>
-      </table>
+  <div class="topbar">
+    <h1>Coordination Dashboard — Benishangul-Gumuz (Nutrition)</h1>
+    <div class="actions">
+      <a class="btn" id="btn-open-map" href="./map.html" target="_blank" rel="noopener">Open full map</a>
+      <button class="btn" type="button" disabled title="Coming soon">Update data (coming soon)</button>
     </div>
   </div>
-</div>
 
-<!-- MIDDLE -->
-<div class="card">
-  <div class="hd">
-    <div class="title">Data Quality</div>
-  </div>
-  <div class="bd">
-    <div style="width:160px;height:160px;">
-      <canvas id="dq-donut"></canvas>
-    </div>
-    <div id="dq-body"></div>
-  </div>
-</div>
+  <div class="wrap">
+    <div class="grid">
 
-<!-- RIGHT -->
-<div class="card">
-  <div class="hd">
-    <div class="title">Map Preview</div>
-  </div>
-  <div class="bd" style="padding:0;">
-    <div class="miniMapBox">
-      <iframe class="miniMapFrame" src="./map.html"></iframe>
-      <a class="miniMapOverlay" href="./map.html" target="_blank"></a>
-      <div class="miniMapHint">Click to open full map</div>
-    </div>
-  </div>
-</div>
+      <!-- LEFT: Timeline + Woreda coverage -->
+      <div class="card">
+        <div class="hd">
+          <div class="title">Timeline (by month)</div>
+          <p class="sub">Grouped by <b>period_month</b>. Status filters apply to the timeline only.</p>
+        </div>
+        <div class="bd">
+          <div class="row">
+            <div class="chips">
+              <label class="chip"><input type="checkbox" id="st-completed" checked> completed</label>
+              <label class="chip"><input type="checkbox" id="st-ongoing" checked> ongoing</label>
+              <label class="chip"><input type="checkbox" id="st-planned" checked> planned</label>
+              <label class="chip"><input type="checkbox" id="st-paused" checked> paused</label>
+            </div>
+            <div class="count"><span id="tl-count">0</span> shown</div>
+          </div>
 
-</div>
-</div>
+          <div class="scroll" id="timeline"></div>
 
-<script>
-const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR_vGAsaVP8WM3PKX1SEcNSit7Ldh5SjwM9c-F01nmS-mDghFpNHcARtVDOzo1Qc7okT2be-Oi05msp/pub?output=csv";
+          <div style="height:12px;"></div>
 
-function parseCSV(text){
-  const rows=[];let row=[],cell="",inQ=false;
-  for(let i=0;i<text.length;i++){
-    const c=text[i],n=text[i+1];
-    if(c=='"'){ if(inQ&&n=='"'){cell+='"';i++;} else inQ=!inQ;}
-    else if(c==','&&!inQ){row.push(cell);cell="";}
-    else if((c=='\n'||c=='\r')&&!inQ){row.push(cell);rows.push(row);row=[];cell="";}
-    else cell+=c;
-  }
-  return rows;
-}
+          <div class="title" style="font-weight:950; font-size:14px; margin:0 0 6px;">Woreda coverage (Nutrition)</div>
+          <p class="sub" style="margin:0 0 10px;">Click a woreda to expand and view interventions (org, type, commodities, beneficiaries, contact). Month filter applies here.</p>
 
-function freshness(d){
-  const date=new Date(d);
-  if(isNaN(date)) return 'na';
-  let days=Math.floor((Date.now()-date)/86400000);
-  if(days<0) days=0;
-  if(days<=7) return 'green';
-  if(days<=21) return 'orange';
-  return 'red';
-}
-
-fetch(CSV_URL).then(r=>r.text()).then(t=>{
-  const grid=parseCSV(t);
-  const headers=grid[0];
-  const data=grid.slice(1).map(r=>{
-    let o={}; headers.forEach((h,i)=>o[h]=r[i]); return o;
-  });
-
-  // Populate months
-  const months=[...new Set(data.map(d=>d.period_month))];
-  const sel=document.getElementById("w-month");
-  months.forEach(m=>{
-    const opt=document.createElement("option");
-    opt.value=m; opt.textContent=m;
-    sel.appendChild(opt);
-  });
-
-  function render(){
-    const month=sel.value;
-    const filtered=month?data.filter(d=>d.period_month==month):data;
-
-    const map={};
-    filtered.forEach(d=>{
-      map[d.woreda]=(map[d.woreda]||0)+1;
-    });
-
-    const body=document.getElementById("woreda-body");
-    body.innerHTML="";
-    Object.entries(map).sort((a,b)=>b[1]-a[1]).forEach(([w,n])=>{
-      const tr=document.createElement("tr");
-      tr.className="wRow";
-      tr.innerHTML=`<td>${w}</td><td align="right">${n}</td>`;
-      body.appendChild(tr);
-    });
-
-    // Data quality
-    const orgLatest={};
-    data.forEach(d=>{
-      if(!orgLatest[d.org_name]|| new Date(d.last_update)>new Date(orgLatest[d.org_name])){
-        orgLatest[d.org_name]=d.last_update;
-      }
-    });
-
-    const bands={green:0,orange:0,red:0,na:0};
-    Object.values(orgLatest).forEach(d=>{
-      bands[freshness(d)]++;
-    });
-
-    new Chart(document.getElementById("dq-donut"),{
-      type:'doughnut',
-      data:{
-        labels:["≤7d","8–21d",">21d","n/a"],
-        datasets:[{
-          data:[bands.green,bands.orange,bands.red,bands.na],
-          backgroundColor:["#2ca02c","#ff7f0e","#d62728","#bdbdbd"]
-        }]
-      },
-      options:{cutout:"70%",plugins:{legend:{display:false}}}
-    });
-  }
-
-  sel.addEventListener("change",render);
-  render();
-});
-</script>
-
-</body>
-</html>
+          <div class="controlsLine">
+            <div class="row" style="gap:8px;">
+              <span class="small">Month</span>
+              <select id="w-month">
+                <option value="">All</option>
+              </select>
+            </div>
+            <div class="small"><span id=
