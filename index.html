@@ -234,7 +234,9 @@
   const ETH_ADM0_URL = url('ethiopia.geojson');
   const ETH_ADM1_URL = url('data/eth_admin1.geojson');
   const ETH_ADM3_URL = url('data/eth_admin3_benishangul.geojson');
-  const INTERVENTIONS_URL = url('data/interventions_benishangul_mock.geojson');
+
+  // ✅ CHANGED: data source now is Google Sheets CSV
+  const INTERVENTIONS_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR_vGAsaVP8WM3PKX1SEcNSit7Ldh5SjwM9c-F01nmS-mDghFpNHcARtVDOzo1Qc7okT2be-Oi05msp/pub?output=csv";
 
   /* =========================
      HELPERS
@@ -267,6 +269,88 @@
       .replace(/'/g,'&#039;');
   }
 
+  /* =========================
+     NEW: CSV -> FeatureCollection (Google Sheet)
+     ========================= */
+  function parseCSV(text) {
+    const rows = [];
+    let row = [];
+    let cell = '';
+    let inQuotes = false;
+
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+      const next = text[i + 1];
+
+      if (ch === '"') {
+        if (inQuotes && next === '"') { cell += '"'; i++; }
+        else { inQuotes = !inQuotes; }
+      } else if (ch === ',' && !inQuotes) {
+        row.push(cell); cell = '';
+      } else if ((ch === '\n' || ch === '\r') && !inQuotes) {
+        if (ch === '\r' && next === '\n') i++;
+        row.push(cell);
+        rows.push(row);
+        row = [];
+        cell = '';
+      } else {
+        cell += ch;
+      }
+    }
+    if (cell.length || row.length) {
+      row.push(cell);
+      rows.push(row);
+    }
+    return rows;
+  }
+
+  function csvToObjects(csvText) {
+    const grid = parseCSV(csvText).filter(r => r.some(c => String(c).trim() !== ''));
+    if (!grid.length) return [];
+    const headers = grid[0].map(h => String(h).trim());
+    const out = [];
+    for (let i = 1; i < grid.length; i++) {
+      const r = grid[i];
+      const obj = {};
+      headers.forEach((h, j) => { obj[h] = (r[j] ?? '').toString().trim(); });
+      out.push(obj);
+    }
+    return out;
+  }
+
+  function toNumberOrNull(v) {
+    const n = Number(String(v ?? '').trim());
+    return Number.isFinite(n) ? n : null;
+  }
+
+  function normalizeProps(obj) {
+    const p = { ...obj };
+    if ('beneficiaries_planned' in p) p.beneficiaries_planned = toNumberOrNull(p.beneficiaries_planned);
+    if ('beneficiaries_reached_to_date' in p) p.beneficiaries_reached_to_date = toNumberOrNull(p.beneficiaries_reached_to_date);
+    return p;
+  }
+
+  function csvToFeatureCollection(csvText) {
+    const rows = csvToObjects(csvText);
+    const features = [];
+
+    for (const r of rows) {
+      const lat = toNumberOrNull(r.latitude);
+      const lon = toNumberOrNull(r.longitude);
+      if (lat == null || lon == null) continue;
+
+      const props = normalizeProps(r);
+
+      features.push({
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: [lon, lat] },
+        properties: props
+      });
+    }
+
+    return { type: 'FeatureCollection', features };
+  }
+
   function interventionPopup(p) {
     return `
       <div class="popup-title">${escapeHtml(p.org_name || 'Unknown')}</div>
@@ -293,7 +377,6 @@
     const s = String(v).trim();
     if (!s) return null;
 
-    // If format is YYYY-MM-DD or YYYY/MM/DD -> local midnight
     const m = s.match(/^(\d{4})[-\/](\d{2})[-\/](\d{2})/);
     if (m) {
       const y = Number(m[1]), mo = Number(m[2]) - 1, d0 = Number(m[3]);
@@ -307,7 +390,7 @@
 
   function freshnessFromLastUpdate(lastUpdate) {
     const d = parseDateLoose(lastUpdate);
-    if (!d) return { band: 'na', color: '#bdbdbd', title: 'No last_update', days: null }; // grey
+    if (!d) return { band: 'na', color: '#bdbdbd', title: 'No last_update', days: null };
     const now = new Date();
     const diffMs = now - d;
     const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
@@ -318,11 +401,10 @@
   }
 
   function freshnessRank(band) {
-    // higher = shown first in sidebar
     if (band === 'red') return 3;
     if (band === 'orange') return 2;
     if (band === 'green') return 1;
-    return 0; // na
+    return 0;
   }
 
   function updateKpi(features) {
@@ -333,7 +415,7 @@
       const fr = freshnessFromLastUpdate(p.last_update);
       if (fr.band === 'na') noDate++;
       else if (fr.band === 'red') outdated++;
-      else upToDate++; // green + orange
+      else upToDate++;
     }
 
     const el = document.getElementById('sidebar-kpi');
@@ -445,7 +527,6 @@
     list.innerHTML = '';
     count.textContent = `${features.length} shown`;
 
-    // NEW: sort by freshness (red -> orange -> green -> na), then by days desc
     const sorted = [...features].sort((a, b) => {
       const pa = a.properties || {};
       const pb = b.properties || {};
@@ -454,11 +535,11 @@
 
       const ra = freshnessRank(fa.band);
       const rb = freshnessRank(fb.band);
-      if (rb !== ra) return rb - ra; // higher rank first
+      if (rb !== ra) return rb - ra;
 
       const da = (fa.days == null) ? -1 : fa.days;
       const db = (fb.days == null) ? -1 : fb.days;
-      return db - da; // older first
+      return db - da;
     });
 
     for (const f of sorted) {
@@ -472,7 +553,6 @@
       const site = p.site_name || '-';
       const month = p.period_month || '-';
 
-      // Freshness dot (sidebar only)
       const fr = freshnessFromLastUpdate(p.last_update);
       const freshnessDot = `
         <span
@@ -523,7 +603,6 @@
 
     clusterGroup.clearLayers();
 
-    // Base filtering (existing logic preserved)
     const baseFiltered = interventionsData.features.filter(f => {
       const p = f.properties || {};
       if (org && p.org_name !== org) return false;
@@ -532,10 +611,8 @@
       return true;
     });
 
-    // NEW: KPI computed on base filters (before outdatedOnly toggle)
     updateKpi(baseFiltered);
 
-    // NEW: Outdated-only filter (>21 days based solely on last_update)
     const filtered = outdatedOnly
       ? baseFiltered.filter(f => {
           const p = f.properties || {};
@@ -544,10 +621,8 @@
         })
       : baseFiltered;
 
-    // Keep current list for export
     currentDisplayedFeatures = filtered;
 
-    // Enable/disable export button
     document.getElementById('btn-export').disabled = (filtered.length === 0);
 
     const markersIndex = new Map();
@@ -572,7 +647,6 @@
     renderSidebar(filtered, markersIndex);
   }
 
-  // NEW: export handler
   document.getElementById('btn-export').addEventListener('click', () => {
     const rows = [];
     rows.push([
@@ -599,13 +673,15 @@
     downloadCsv(`interventions_export_${ts}.csv`, rows);
   });
 
+  // ✅ CHANGED: fetch CSV -> convert -> proceed as before
   fetch(INTERVENTIONS_URL)
-    .then(r => r.json())
-    .then(fc => {
+    .then(r => r.text())
+    .then(csvText => {
+      const fc = csvToFeatureCollection(csvText);
       interventionsData = fc;
 
-      const orgs = [...new Set(fc.features.map(f => f.properties.org_name))].sort();
-      const months = [...new Set(fc.features.map(f => f.properties.period_month))].sort();
+      const orgs = [...new Set(fc.features.map(f => (f.properties.org_name || '').trim()).filter(Boolean))].sort();
+      const months = [...new Set(fc.features.map(f => (f.properties.period_month || '').trim()).filter(Boolean))].sort();
 
       const orgSel = document.getElementById('filter-org');
       orgs.forEach(o => {
@@ -626,7 +702,6 @@
       ['filter-org','filter-status','filter-month','filter-outdated']
         .forEach(id => document.getElementById(id).addEventListener('change', applyFilters));
 
-      // initial state: export disabled until data rendered
       document.getElementById('btn-export').disabled = true;
 
       applyFilters();
