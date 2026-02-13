@@ -438,4 +438,641 @@
                 <option value="">All</option>
               </select>
             </div>
-            <div class="small"><span id=
+            <div class="small"><span id="w-count">0</span> woredas</div>
+          </div>
+
+          <div class="wScroll">
+            <table class="wTable">
+              <thead>
+                <tr>
+                  <th>Woreda</th>
+                  <th># interventions</th>
+                </tr>
+              </thead>
+              <tbody id="woreda-body"></tbody>
+            </table>
+          </div>
+
+          <div class="statusbar">
+            <div>Source: Google Sheets CSV</div>
+            <div id="load-status" class="small">Loading…</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- MIDDLE: Data quality -->
+      <div class="card">
+        <div class="hd">
+          <div class="title">Data quality — last org update</div>
+          <p class="sub">Latest <b>last_update</b> per org. Donut reflects this table (current dataset). Hover donut segments to see org names.</p>
+        </div>
+        <div class="bd">
+
+          <div class="dqWrap">
+            <div class="dqCanvasBox">
+              <canvas id="dq-donut"></canvas>
+            </div>
+            <div id="dq-legend"></div>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Organisation</th>
+                <th style="text-align:right;">Last update</th>
+              </tr>
+            </thead>
+            <tbody id="dq-body"></tbody>
+          </table>
+
+          <div class="statusbar">
+            <div class="small">Bands: ≤7d (green), 8–21d (orange), &gt;21d (red), n/a (grey)</div>
+            <div id="dq-summary" class="small"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT: Map preview -->
+      <div class="card">
+        <div class="hd">
+          <div class="title">Map preview</div>
+          <p class="sub">Click preview to open the full map.</p>
+        </div>
+        <div class="bd" style="padding:0;">
+          <div class="miniMapBox miniMapLink">
+            <iframe class="miniMapFrame" id="miniMapFrame" src="./map.html" title="Map preview" loading="lazy"></iframe>
+            <a class="miniMapOverlay" id="miniMapOverlay" href="./map.html" target="_blank" rel="noopener" aria-label="Open full map"></a>
+            <div class="miniMapHint">Click to open full map</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+<script>
+  // =========================
+  // CONFIG
+  // =========================
+  const INTERVENTIONS_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR_vGAsaVP8WM3PKX1SEcNSit7Ldh5SjwM9c-F01nmS-mDghFpNHcARtVDOzo1Qc7okT2be-Oi05msp/pub?output=csv";
+
+  // map page (your Leaflet page)
+  const MAP_URL = "./map.html";
+
+  // =========================
+  // CSV parsing
+  // =========================
+  function parseCSV(text) {
+    const rows = [];
+    let row = [];
+    let cell = '';
+    let inQuotes = false;
+
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+      const next = text[i + 1];
+
+      if (ch === '"') {
+        if (inQuotes && next === '"') { cell += '"'; i++; }
+        else { inQuotes = !inQuotes; }
+      } else if (ch === ',' && !inQuotes) {
+        row.push(cell); cell = '';
+      } else if ((ch === '\n' || ch === '\r') && !inQuotes) {
+        if (ch === '\r' && next === '\n') i++;
+        row.push(cell);
+        rows.push(row);
+        row = [];
+        cell = '';
+      } else {
+        cell += ch;
+      }
+    }
+    if (cell.length || row.length) {
+      row.push(cell);
+      rows.push(row);
+    }
+    return rows;
+  }
+
+  function csvToObjects(csvText) {
+    const grid = parseCSV(csvText).filter(r => r.some(c => String(c).trim() !== ''));
+    if (!grid.length) return [];
+    const headers = grid[0].map(h => String(h).trim());
+    const out = [];
+    for (let i = 1; i < grid.length; i++) {
+      const r = grid[i];
+      const obj = {};
+      headers.forEach((h, j) => { obj[h] = (r[j] ?? '').toString().trim(); });
+      out.push(obj);
+    }
+    return out;
+  }
+
+  // =========================
+  // Helpers
+  // =========================
+  function escapeHtml(str) {
+    return String(str ?? '')
+      .replace(/&/g,'&amp;')
+      .replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;')
+      .replace(/'/g,'&#039;');
+  }
+
+  function statusClass(status) {
+    const s = String(status || '').toLowerCase();
+    if (s === 'planned') return 'planned';
+    if (s === 'ongoing') return 'ongoing';
+    if (s === 'completed') return 'completed';
+    if (s === 'paused') return 'paused';
+    return 'planned';
+  }
+
+  function parseDateLoose(v) {
+    if (!v) return null;
+    if (v instanceof Date && !isNaN(v)) return v;
+    const s = String(v).trim();
+    if (!s) return null;
+
+    const m = s.match(/^(\d{4})[-\/](\d{2})[-\/](\d{2})/);
+    if (m) {
+      const y = Number(m[1]), mo = Number(m[2]) - 1, d0 = Number(m[3]);
+      const d = new Date(y, mo, d0);
+      return isNaN(d) ? null : d;
+    }
+    const d = new Date(s);
+    return isNaN(d) ? null : d;
+  }
+
+  function freshnessFromLastUpdate(lastUpdate) {
+    const d = parseDateLoose(lastUpdate);
+    if (!d) return { band: 'na', days: null };
+
+    const now = new Date();
+    let days = Math.floor((now - d) / (1000 * 60 * 60 * 24));
+    if (!isFinite(days)) return { band: 'na', days: null };
+
+    // future dates -> treat as 0 day old (green)
+    if (days < 0) days = 0;
+
+    if (days <= 7)  return { band: 'green',  days };
+    if (days <= 21) return { band: 'orange', days };
+    return { band: 'red', days };
+  }
+
+  // =========================
+  // State
+  // =========================
+  let rows = [];
+  let dqChart = null;
+  let dqBandToOrgs = { green: [], orange: [], red: [], na: [] };
+  let expandedWoredaKey = null;
+
+  // =========================
+  // Timeline
+  // =========================
+  function getTimelineStatusFilterSet() {
+    const set = new Set();
+    if (document.getElementById('st-completed').checked) set.add('completed');
+    if (document.getElementById('st-ongoing').checked) set.add('ongoing');
+    if (document.getElementById('st-planned').checked) set.add('planned');
+    if (document.getElementById('st-paused').checked) set.add('paused');
+    return set;
+  }
+
+  function renderTimeline() {
+    const container = document.getElementById('timeline');
+    container.innerHTML = '';
+
+    const allowed = getTimelineStatusFilterSet();
+
+    const filtered = rows.filter(r => allowed.has(String(r.status || '').toLowerCase()));
+
+    const byMonth = new Map();
+    for (const r of filtered) {
+      const m = (r.period_month || '').trim() || 'Unknown';
+      if (!byMonth.has(m)) byMonth.set(m, []);
+      byMonth.get(m).push(r);
+    }
+
+    const months = [...byMonth.keys()].sort((a,b) => b.localeCompare(a));
+
+    let totalShown = 0;
+
+    for (const m of months) {
+      const list = byMonth.get(m) || [];
+      list.sort((a,b) => (a.org_name || '').localeCompare(b.org_name || '') || (a.woreda || '').localeCompare(b.woreda || ''));
+
+      const hdr = document.createElement('div');
+      hdr.className = 'monthHdr';
+      hdr.textContent = m;
+      container.appendChild(hdr);
+
+      for (const r of list) {
+        totalShown++;
+
+        const org = r.org_name || 'Unknown org';
+        const woreda = r.woreda || '-';
+        const site = r.site_name || '-';
+        const type = r.intervention_type || '-';
+        const status = String(r.status || '').toLowerCase() || '-';
+        const stClass = statusClass(status);
+
+        const it = document.createElement('div');
+        it.className = 'item';
+        it.innerHTML = `
+          <div class="left">
+            <div class="org">${escapeHtml(org)}</div>
+            <div class="line">${escapeHtml(woreda)} — ${escapeHtml(site)} — <span class="muted">${escapeHtml(type)}</span></div>
+          </div>
+          <div class="pill ${stClass}">${escapeHtml(status)}</div>
+        `;
+        container.appendChild(it);
+      }
+    }
+
+    document.getElementById('tl-count').textContent = String(totalShown);
+  }
+
+  // =========================
+  // Woreda coverage + expand
+  // =========================
+  function getWoredaFilteredRows() {
+    const month = document.getElementById('w-month').value;
+    return rows.filter(r => month ? (r.period_month || '').trim() === month : true);
+  }
+
+  function renderWoredaPanelHtml(woreda) {
+    const month = document.getElementById('w-month').value;
+    const filtered = getWoredaFilteredRows().filter(r => ((r.woreda || '').trim() || 'Unknown') === woreda);
+
+    filtered.sort((a,b) =>
+      (a.org_name || '').localeCompare(b.org_name || '') ||
+      (a.site_name || '').localeCompare(b.site_name || '')
+    );
+
+    const titleMonth = month ? `(${escapeHtml(month)})` : '(All months)';
+
+    const itemsHtml = filtered.map(r => {
+      const org = r.org_name || 'Unknown';
+      const site = r.site_name || '-';
+      const status = String(r.status || '').toLowerCase() || '-';
+      const stClass = statusClass(status);
+
+      const pm = r.period_month || '—';
+      const lu = r.last_update || '—';
+
+      const planned = r.beneficiaries_planned || '';
+      const reached = r.beneficiaries_reached_to_date || '';
+
+      const act = r.intervention_type || '';
+      const comm = r.commodities || '';
+      const next = r.next_action || '';
+      const cName = r.contact_name || '';
+      const cEmail = r.contact_email || '';
+      const sType = r.site_type || '';
+      const zone = r.zone || '';
+
+      return `
+        <div class="wIt">
+          <div class="left">
+            <div class="t1">
+              ${escapeHtml(org)}
+              <span class="pillMini ${stClass}">${escapeHtml(status)}</span>
+            </div>
+            <div class="t2">
+              ${escapeHtml(site)} <span class="muted">(${escapeHtml(sType)})</span>
+              <span class="muted">— ${escapeHtml(act)}</span>
+            </div>
+
+            <div class="kvs">
+              <span><b>Zone:</b> ${escapeHtml(zone || '—')}</span>
+              <span><b>Month:</b> ${escapeHtml(pm)}</span>
+              <span><b>Last update:</b> ${escapeHtml(lu)}</span>
+              <span><b>Planned:</b> ${escapeHtml(planned || '—')}</span>
+              <span><b>Reached:</b> ${escapeHtml(reached || '—')}</span>
+            </div>
+
+            <div class="kvs">
+              <span><b>Commodities:</b> ${escapeHtml(comm || '—')}</span>
+              <span><b>Next action:</b> ${escapeHtml(next || '—')}</span>
+            </div>
+
+            <div class="kvs">
+              <span><b>Contact:</b> ${escapeHtml(cName || '—')}</span>
+              <span><b>Email:</b> ${escapeHtml(cEmail || '—')}</span>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    const empty = filtered.length === 0
+      ? `<div class="small">No interventions for this woreda in the selected month.</div>`
+      : `<div class="wList">${itemsHtml}</div>`;
+
+    return `
+      <div class="wPanel">
+        <div class="wPanelHeader">
+          <div class="ttl">Interventions — ${escapeHtml(woreda)} ${titleMonth}</div>
+          <div class="small"><b>${filtered.length}</b> record(s)</div>
+        </div>
+        ${empty}
+      </div>
+    `;
+  }
+
+  function renderWoredaTable() {
+    const filtered = getWoredaFilteredRows();
+
+    const counts = new Map();
+    for (const r of filtered) {
+      const w = (r.woreda || '').trim() || 'Unknown';
+      counts.set(w, (counts.get(w) || 0) + 1);
+    }
+
+    const items = [...counts.entries()]
+      .map(([w, n]) => ({ w, n }))
+      .sort((a,b) => b.n - a.n || a.w.localeCompare(b.w));
+
+    const body = document.getElementById('woreda-body');
+    body.innerHTML = '';
+
+    for (const it of items) {
+      const woredaKey = it.w;
+
+      const tr = document.createElement('tr');
+      tr.className = 'wRow';
+      tr.dataset.woreda = woredaKey;
+      tr.innerHTML = `
+        <td class="wName">
+          <span class="caret">${expandedWoredaKey === woredaKey ? '▾' : '▸'}</span>
+          ${escapeHtml(it.w)}
+        </td>
+        <td>${it.n}</td>
+      `;
+      body.appendChild(tr);
+
+      if (expandedWoredaKey === woredaKey) {
+        const expand = document.createElement('tr');
+        expand.className = 'wExpand';
+        expand.innerHTML = `<td colspan="2">${renderWoredaPanelHtml(woredaKey)}</td>`;
+        body.appendChild(expand);
+      }
+    }
+
+    document.getElementById('w-count').textContent = String(items.length);
+
+    // bind click
+    body.querySelectorAll('.wRow').forEach(rowEl => {
+      rowEl.addEventListener('click', () => {
+        const w = rowEl.dataset.woreda;
+        expandedWoredaKey = (expandedWoredaKey === w) ? null : w;
+        renderWoredaTable();
+      });
+    });
+  }
+
+  function populateMonthDropdown() {
+    const sel = document.getElementById('w-month');
+    const existing = new Set([...sel.options].map(o => o.value));
+    const months = [...new Set(rows.map(r => (r.period_month || '').trim()).filter(Boolean))].sort((a,b)=> b.localeCompare(a));
+    for (const m of months) {
+      if (existing.has(m)) continue;
+      const opt = document.createElement('option');
+      opt.value = m;
+      opt.textContent = m;
+      sel.appendChild(opt);
+    }
+  }
+
+  // =========================
+  // Data quality (donut + table)
+  // =========================
+  function computeDataQuality() {
+    const latest = new Map(); // org -> {dateObj, dateStr}
+    const counts = new Map(); // org -> nb records
+
+    for (const r of rows) {
+      const org = (r.org_name || '').trim() || 'Unknown';
+      counts.set(org, (counts.get(org) || 0) + 1);
+
+      const d = parseDateLoose(r.last_update);
+      const prev = latest.get(org) || null;
+      if (!prev) {
+        latest.set(org, { dateObj: d, dateStr: (r.last_update || '').trim() });
+      } else {
+        // keep latest parsable date; if unparsable, keep existing
+        if (d && (!prev.dateObj || d > prev.dateObj)) {
+          latest.set(org, { dateObj: d, dateStr: (r.last_update || '').trim() });
+        } else if (!prev.dateObj && (r.last_update || '').trim()) {
+          // still no parsable date, keep some string
+          latest.set(org, { dateObj: null, dateStr: prev.dateStr || (r.last_update || '').trim() });
+        }
+      }
+    }
+
+    const orgRows = [];
+    dqBandToOrgs = { green: [], orange: [], red: [], na: [] };
+
+    for (const [org, info] of latest.entries()) {
+      const fr = freshnessFromLastUpdate(info.dateObj || info.dateStr);
+      orgRows.push({
+        org,
+        count: counts.get(org) || 0,
+        last_update: info.dateStr || '',
+        fr
+      });
+      dqBandToOrgs[fr.band].push(org);
+    }
+
+    const rank = (band) => band === 'red' ? 3 : band === 'orange' ? 2 : band === 'green' ? 1 : 0;
+    orgRows.sort((a,b) => {
+      const ra = rank(a.fr.band), rb = rank(b.fr.band);
+      if (rb !== ra) return rb - ra;
+      return a.org.localeCompare(b.org);
+    });
+
+    // sort org lists for tooltip cleanliness
+    Object.keys(dqBandToOrgs).forEach(k => dqBandToOrgs[k].sort((a,b)=>a.localeCompare(b)));
+
+    return orgRows;
+  }
+
+  function renderDataQuality() {
+    const orgRows = computeDataQuality();
+
+    const greenOrgs = dqBandToOrgs.green || [];
+    const orangeOrgs = dqBandToOrgs.orange || [];
+    const redOrgs = dqBandToOrgs.red || [];
+    const naOrgs = dqBandToOrgs.na || [];
+
+    const g = greenOrgs.length, o = orangeOrgs.length, r = redOrgs.length, n = naOrgs.length;
+    const total = g + o + r + n;
+
+    document.getElementById('dq-legend').innerHTML = `
+      <div class="legendRow"><span class="dot g"></span> ≤7 days: <b>${g}</b></div>
+      <div class="legendRow"><span class="dot o"></span> 8–21 days: <b>${o}</b></div>
+      <div class="legendRow"><span class="dot r"></span> >21 days: <b>${r}</b></div>
+      <div class="legendRow"><span class="dot n"></span> n/a: <b>${n}</b></div>
+      <div style="margin-top:6px;"><span class="small">Total orgs:</span> <b>${total}</b></div>
+    `;
+
+    const body = document.getElementById('dq-body');
+    body.innerHTML = '';
+    for (const it of orgRows) {
+      const band = it.fr.band;
+      const dotClass = band === 'green' ? 'g' : band === 'orange' ? 'o' : band === 'red' ? 'r' : 'n';
+      const title = band === 'na' ? 'No valid last_update' : `${it.fr.days} day(s) old`;
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>
+          <div class="orgCell">
+            <span class="dot ${dotClass}" title="${escapeHtml(title)}"></span>
+            <div class="orgName" title="${escapeHtml(it.org)}">${escapeHtml(it.org)}</div>
+            <span class="small">(${it.count})</span>
+          </div>
+        </td>
+        <td class="dateCell" style="text-align:right;">
+          ${escapeHtml(it.last_update || '—')}
+        </td>
+      `;
+      body.appendChild(tr);
+    }
+
+    document.getElementById('dq-summary').textContent = total ? `${total} organisations tracked` : 'No organisations';
+
+    // Donut
+    const ctx = document.getElementById('dq-donut').getContext('2d');
+
+    const labels = ['≤7 days', '8–21 days', '>21 days', 'n/a'];
+    const data = [g, o, r, n];
+
+    const colors = [
+      getComputedStyle(document.documentElement).getPropertyValue('--green').trim(),
+      getComputedStyle(document.documentElement).getPropertyValue('--orange').trim(),
+      getComputedStyle(document.documentElement).getPropertyValue('--red').trim(),
+      getComputedStyle(document.documentElement).getPropertyValue('--grey').trim()
+    ];
+
+    const bandOrgs = [greenOrgs, orangeOrgs, redOrgs, naOrgs];
+
+    if (dqChart) dqChart.destroy();
+
+    dqChart = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels,
+        datasets: [{
+          data,
+          backgroundColor: colors,
+          borderWidth: 0
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '68%',
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              title: (items) => {
+                const i = items[0].dataIndex;
+                return `${labels[i]} — ${data[i]} org(s)`;
+              },
+              label: (item) => {
+                const i = item.dataIndex;
+                const orgs = bandOrgs[i] || [];
+                if (!orgs.length) return '—';
+
+                // keep readable
+                const max = 18;
+                const shown = orgs.slice(0, max);
+                const rest = orgs.length - shown.length;
+                const line = shown.join(', ');
+                return rest > 0 ? `${line} … (+${rest})` : line;
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+
+  // =========================
+  // Events
+  // =========================
+  function wireEvents() {
+    ['st-completed','st-ongoing','st-planned','st-paused'].forEach(id => {
+      document.getElementById(id).addEventListener('change', renderTimeline);
+    });
+
+    document.getElementById('w-month').addEventListener('change', () => {
+      expandedWoredaKey = null; // reset open panel on month change
+      renderWoredaTable();
+    });
+  }
+
+  // =========================
+  // Load
+  // =========================
+  async function main() {
+    // Wire map links
+    document.getElementById('btn-open-map').setAttribute('href', MAP_URL);
+    document.getElementById('miniMapFrame').setAttribute('src', MAP_URL);
+    document.getElementById('miniMapOverlay').setAttribute('href', MAP_URL);
+
+    const statusEl = document.getElementById('load-status');
+
+    try {
+      statusEl.textContent = 'Loading CSV…';
+      const resp = await fetch(INTERVENTIONS_URL);
+      if (!resp.ok) throw new Error(`CSV fetch failed: ${resp.status}`);
+      const csvText = await resp.text();
+
+      rows = csvToObjects(csvText);
+
+      // Normalize/ensure the exact expected headers exist (your sheet already uses these)
+      rows = rows.map(r => ({
+        org_name: (r.org_name || '').trim(),
+        cluster: (r.cluster || '').trim(),
+        intervention_type: (r.intervention_type || '').trim(),
+        zone: (r.zone || '').trim(),
+        woreda: (r.woreda || '').trim(),
+        site_name: (r.site_name || '').trim(),
+        site_type: (r.site_type || '').trim(),
+        latitude: (r.latitude || '').trim(),
+        longitude: (r.longitude || '').trim(),
+        period_month: (r.period_month || '').trim(),
+        status: (r.status || '').trim(),
+        beneficiaries_planned: (r.beneficiaries_planned || '').trim(),
+        beneficiaries_reached_to_date: (r.beneficiaries_reached_to_date || '').trim(),
+        commodities: (r.commodities || '').trim(),
+        last_update: (r.last_update || '').trim(),
+        next_action: (r.next_action || '').trim(),
+        contact_name: (r.contact_name || '').trim(),
+        contact_email: (r.contact_email || '').trim()
+      }));
+
+      statusEl.textContent = `Loaded ${rows.length} records`;
+
+      populateMonthDropdown();
+      renderTimeline();
+      renderWoredaTable();
+      renderDataQuality();
+      wireEvents();
+
+    } catch (e) {
+      statusEl.innerHTML = `<span class="err">Error:</span> ${escapeHtml(e.message || String(e))}`;
+      console.error(e);
+    }
+  }
+
+  main();
+</script>
+
+</body>
+</html>
