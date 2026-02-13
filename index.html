@@ -97,6 +97,12 @@
     .kvs span{margin-right:10px;white-space:nowrap;display:inline-block;}
     .pillMini{font-size:11px;font-weight:900;padding:2px 8px;border-radius:999px;color:#fff;line-height:16px;white-space:nowrap;margin-left:6px;}
 
+    /* FIX 1: Woreda expanded panel — enforce left alignment */
+    .wPanel, .wPanel * { text-align: left; }
+    .wIt{ display:block; }
+    .wIt .t1{ display:block; text-align:left; }
+    .wIt .t2, .wIt .kvs{ text-align:left; }
+
     /* Data quality */
     .dqWrap{display:flex;align-items:center;gap:14px;margin:10px 0 12px;flex-wrap:wrap;}
     .dqCanvasBox{width:150px;height:150px;flex:0 0 auto;}
@@ -131,7 +137,7 @@
   <div class="topbar">
     <h1>Coordination Dashboard — Benishangul-Gumuz (Nutrition)</h1>
     <div class="actions">
-      <a class="btn" id="btn-open-map" href="./map.html" target="_blank" rel="noopener">Open full map</a>
+      <a class="btn" id="btn-open-map" href="./map.html?embed=1" target="_blank" rel="noopener">Open full map</a>
       <button class="btn" type="button" disabled title="Coming soon">Update data (coming soon)</button>
     </div>
   </div>
@@ -223,8 +229,8 @@
         </div>
         <div class="bd" style="padding:0;">
           <div class="miniMapBox miniMapLink">
-            <iframe class="miniMapFrame" id="miniMapFrame" src="./map.html" title="Map preview" loading="lazy"></iframe>
-            <a class="miniMapOverlay" id="miniMapOverlay" href="./map.html" target="_blank" rel="noopener" aria-label="Open full map"></a>
+            <iframe class="miniMapFrame" id="miniMapFrame" src="./map.html?embed=1" title="Map preview" loading="lazy"></iframe>
+            <a class="miniMapOverlay" id="miniMapOverlay" href="./map.html?embed=1" target="_blank" rel="noopener" aria-label="Open full map"></a>
             <div class="miniMapHint">Click to open full map</div>
           </div>
         </div>
@@ -238,7 +244,7 @@
   // CONFIG
   // =========================
   const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR_vGAsaVP8WM3PKX1SEcNSit7Ldh5SjwM9c-F01nmS-mDghFpNHcARtVDOzo1Qc7okT2be-Oi05msp/pub?output=csv";
-  const MAP_URL = "./map.html";
+  const MAP_URL = "./map.html?embed=1";
 
   // =========================
   // Helpers
