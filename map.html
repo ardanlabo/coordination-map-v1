@@ -1,197 +1,99 @@
-Map.html 15022025
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <title>Coordination GIS – Benishangul-Gumuz</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="utf-8" />
+<title>Coordination GIS – Benishangul-Gumuz</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <!-- Leaflet CSS -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
 
-  <!-- MarkerCluster CSS -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
+<style>
+html, body { margin:0; padding:0; height:100%; }
+#map { width:100%; height:100%; }
 
-  <style>
-    html, body { margin: 0; padding: 0; height: 100%; }
-    #map { width: 100%; height: 100%; }
+/* Sidebar */
+#sidebar{
+  position:absolute; top:10px; left:10px; z-index:1000;
+  width:320px; max-height:calc(100% - 20px);
+  background:#fff; border-radius:8px;
+  box-shadow:0 0 8px rgba(0,0,0,0.25);
+  overflow:hidden; font-size:13px;
+}
+.sidebar-header{
+  padding:10px; border-bottom:1px solid #eee;
+  display:flex; align-items:baseline;
+  justify-content:space-between; gap:10px;
+  flex-wrap:wrap;
+}
+.sidebar-title{ font-weight:800; }
+.sidebar-count{ color:#666; }
+#sidebar-kpi{
+  width:100%; margin-top:6px;
+  font-size:12px; color:#555;
+  display:flex; gap:10px; flex-wrap:wrap;
+}
+.kpi-chip{
+  display:inline-flex; align-items:center; gap:6px;
+  background:#f6f6f6; border:1px solid #eee;
+  border-radius:999px; padding:2px 8px;
+  line-height:18px;
+}
+.kpi-dot{ width:8px;height:8px;border-radius:50%; }
+.sidebar-list{ overflow:auto; max-height:calc(100% - 74px); }
+.item{ padding:10px; border-bottom:1px solid #f0f0f0; cursor:pointer; }
+.item:hover{ background:#f8f8f8; }
+.item-top{ display:flex; justify-content:space-between; margin-bottom:4px; }
+.badge{ padding:2px 8px; border-radius:999px; color:#fff; font-size:12px; }
+.item-main{ font-weight:700; }
+.item-sub{ color:#666; }
 
-    /* Sidebar (left) */
-    #sidebar{
-      position:absolute;
-      top:10px;
-      left:10px;
-      z-index:1000;
-      width:320px;
-      max-height: calc(100% - 20px);
-      background:#fff;
-      border-radius:8px;
-      box-shadow:0 0 8px rgba(0,0,0,0.25);
-      overflow:hidden;
-      font-size:13px;
-    }
-    .sidebar-header{
-      padding:10px;
-      border-bottom:1px solid #eee;
-      display:flex;
-      align-items:baseline;
-      justify-content:space-between;
-      gap:10px;
-      flex-wrap:wrap;
-    }
-    .sidebar-title{ font-weight:800; }
-    .sidebar-count{ color:#666; }
+/* Filters */
+#controls{
+  position:absolute; top:10px; right:10px; z-index:1000;
+  background:white; padding:10px;
+  border-radius:6px; box-shadow:0 0 6px rgba(0,0,0,0.3);
+  width:240px; font-size:13px;
+}
+#controls label{ display:block; margin-top:6px; font-weight:600; }
+#controls select{ width:100%; }
+.controls-row{ margin-top:10px; }
+.btn{
+  width:100%; margin-top:10px;
+  padding:8px; border:1px solid #ddd;
+  background:#fafafa; border-radius:6px;
+  cursor:pointer; font-weight:600;
+}
+.btn:hover{ background:#f2f2f2; }
 
-    /* KPI block */
-    #sidebar-kpi{
-      width:100%;
-      margin-top:6px;
-      font-size:12px;
-      color:#555;
-      display:flex;
-      gap:10px;
-      flex-wrap:wrap;
-    }
-    .kpi-chip{
-      display:inline-flex;
-      align-items:center;
-      gap:6px;
-      background:#f6f6f6;
-      border:1px solid #eee;
-      border-radius:999px;
-      padding:2px 8px;
-      line-height:18px;
-      white-space:nowrap;
-    }
-    .kpi-dot{
-      width:8px;height:8px;border-radius:50%;
-      display:inline-block;
-    }
-
-    .sidebar-list{
-      overflow:auto;
-      max-height: calc(100% - 74px);
-    }
-    .item{
-      padding:10px;
-      border-bottom:1px solid #f0f0f0;
-      cursor:pointer;
-    }
-    .item:hover{ background:#f8f8f8; }
-    .item-top{
-      display:flex;
-      justify-content:space-between;
-      gap:10px;
-      margin-bottom:4px;
-      align-items:center;
-    }
-    .badge{
-      padding:2px 8px;
-      border-radius:999px;
-      color:#fff;
-      font-size:12px;
-      line-height:18px;
-      white-space:nowrap;
-    }
-    .item-main{ font-weight:700; }
-    .item-sub{ color:#666; margin-top:2px; }
-
-    /* Filters panel (right) */
-    #controls {
-      position: absolute;
-      top: 10px;
-      right: 10px;
-      z-index: 1000;
-      background: white;
-      padding: 10px;
-      border-radius: 6px;
-      box-shadow: 0 0 6px rgba(0,0,0,0.3);
-      width: 240px;
-      font-size: 13px;
-    }
-    #controls h4 { margin: 6px 0; }
-    #controls label { display: block; margin-top: 6px; font-weight: 600; }
-    #controls select { width: 100%; }
-
-    /* checkbox + button styles */
-    .controls-row{
-      display:flex;
-      align-items:center;
-      gap:8px;
-      margin-top:10px;
-      user-select:none;
-    }
-    .controls-row input[type="checkbox"]{ transform: translateY(1px); }
-    .btn{
-      width:100%;
-      margin-top:10px;
-      padding:8px 10px;
-      border:1px solid #ddd;
-      background:#fafafa;
-      border-radius:6px;
-      cursor:pointer;
-      font-weight:600;
-    }
-    .btn:hover{ background:#f2f2f2; }
-    .btn:disabled{ opacity:0.55; cursor:not-allowed; }
-
-    /* Legend */
-    .legend-row { display: flex; align-items: center; margin: 4px 0; }
-    .dot {
-      width: 12px; height: 12px; border-radius: 50%;
-      display: inline-block; margin-right: 6px;
-    }
-    .dot.planned { background: #808080; }
-    .dot.ongoing { background: #1f77b4; }
-    .dot.completed { background: #2ca02c; }
-    .dot.paused { background: #ff7f0e; }
-
-    /* Popup */
-    .popup-title { font-weight: 700; margin-bottom: 6px; }
-    .popup-row { margin: 2px 0; }
-
-    /* Colored marker for clustering (divIcon) */
-    .status-pin{
-      width:12px;height:12px;border-radius:50%;
-      border:2px solid #fff;
-      box-shadow:0 0 2px rgba(0,0,0,0.5);
-    }
-
-    /* ======================================================
-       ✅ EMBED MODE (map.html?embed=1)
-       - hides floating panels so the preview is never covered
-       ====================================================== */
-    body.embed #controls,
-    body.embed #sidebar{
-      display:none !important;
-    }
-  </style>
+.status-pin{
+  width:12px;height:12px;border-radius:50%;
+  border:2px solid #fff;
+}
+</style>
 </head>
 <body>
 
 <div id="map"></div>
 
-<!-- Sidebar -->
 <div id="sidebar">
   <div class="sidebar-header">
     <div class="sidebar-title">Interventions</div>
     <div id="sidebar-count" class="sidebar-count">0 shown</div>
-
     <div id="sidebar-kpi"></div>
   </div>
   <div id="sidebar-list" class="sidebar-list"></div>
 </div>
 
-<!-- Filters -->
 <div id="controls">
   <h4>Filters</h4>
 
   <label>Organisation</label>
-  <select id="filter-org">
-    <option value="">All</option>
-  </select>
+  <select id="filter-org"><option value="">All</option></select>
+
+  <label>Woreda</label>
+  <select id="filter-woreda"><option value="">All</option></select>
 
   <label>Status</label>
   <select id="filter-status">
@@ -203,524 +105,164 @@ Map.html 15022025
   </select>
 
   <label>Month</label>
-  <select id="filter-month">
-    <option value="">All</option>
-  </select>
+  <select id="filter-month"><option value="">All</option></select>
 
   <div class="controls-row">
-    <input type="checkbox" id="filter-outdated" />
-    <label for="filter-outdated" style="display:inline; margin:0; font-weight:600;">
-      Outdated only (&gt;21 days)
-    </label>
+    <input type="checkbox" id="filter-outdated"/>
+    <label for="filter-outdated">Outdated only (&gt;21 days)</label>
   </div>
 
-  <button class="btn" id="btn-export" type="button">Export CSV (current list)</button>
+  <button class="btn" id="btn-export">Export CSV</button>
 </div>
 
-<!-- Leaflet JS -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<!-- MarkerCluster JS -->
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 
 <script>
-  /* =========================
-     ✅ EMBED MODE FLAG
-     ========================= */
-  if (new URLSearchParams(window.location.search).get('embed') === '1') {
-    document.body.classList.add('embed');
+
+/* =========================
+   MAP
+   ========================= */
+const map = L.map('map').setView([10.5,35.7],7);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+  attribution:'&copy; OpenStreetMap contributors'
+}).addTo(map);
+
+/* =========================
+   DATA SOURCE
+   ========================= */
+const INTERVENTIONS_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR_vGAsaVP8WM3PKX1SEcNSit7Ldh5SjwM9c-F01nmS-mDghFpNHcARtVDOzo1Qc7okT2be-Oi05msp/pub?output=csv";
+
+let interventionsData=null;
+
+const clusterGroup=L.markerClusterGroup();
+map.addLayer(clusterGroup);
+
+/* =========================
+   HELPERS
+   ========================= */
+function statusColor(s){
+  s=String(s||'').toLowerCase();
+  if(s==='planned')return'#808080';
+  if(s==='ongoing')return'#1f77b4';
+  if(s==='completed')return'#2ca02c';
+  if(s==='paused')return'#ff7f0e';
+  return'#000';
+}
+function statusIcon(s){
+  return L.divIcon({
+    className:'',
+    html:`<div class="status-pin" style="background:${statusColor(s)}"></div>`,
+    iconSize:[12,12], iconAnchor:[6,6]
+  });
+}
+
+/* =========================
+   CSV PARSER
+   ========================= */
+function parseCSV(t){
+  const rows=[]; let row=[],cell='',inQuotes=false;
+  for(let i=0;i<t.length;i++){
+    const ch=t[i],next=t[i+1];
+    if(ch==='"'){
+      if(inQuotes&&next==='"'){cell+='"';i++;}
+      else inQuotes=!inQuotes;
+    }else if(ch===','&&!inQuotes){
+      row.push(cell);cell='';
+    }else if((ch==='\n'||ch==='\r')&&!inQuotes){
+      if(ch==='\r'&&next==='\n')i++;
+      row.push(cell);rows.push(row);row=[];cell='';
+    }else cell+=ch;
   }
-
-  /* =========================
-     BASE PATH (GitHub Pages safe)
-     ========================= */
-  const BASE = window.location.pathname.endsWith('/')
-    ? window.location.pathname
-    : window.location.pathname.replace(/\/[^\/]*$/, '/');
-  const url = (p) => BASE + p.replace(/^\//, '');
-
-  /* =========================
-     MAP
-     ========================= */
-  const map = L.map('map').setView([10.5, 35.7], 7);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; OpenStreetMap contributors'
-  }).addTo(map);
-
-  const ETH_ADM0_URL = url('ethiopia.geojson');
-  const ETH_ADM1_URL = url('data/eth_admin1.geojson');
-  const ETH_ADM3_URL = url('data/eth_admin3_benishangul.geojson');
-
-  // ✅ data source: Google Sheets CSV
-  const INTERVENTIONS_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR_vGAsaVP8WM3PKX1SEcNSit7Ldh5SjwM9c-F01nmS-mDghFpNHcARtVDOzo1Qc7okT2be-Oi05msp/pub?output=csv";
-
-  /* =========================
-     HELPERS
-     ========================= */
-  function statusColor(status) {
-    const s = String(status || '').toLowerCase();
-    if (s === 'planned') return '#808080';
-    if (s === 'ongoing') return '#1f77b4';
-    if (s === 'completed') return '#2ca02c';
-    if (s === 'paused') return '#ff7f0e';
-    return '#000000';
-  }
-
-  function statusIcon(status) {
-    const c = statusColor(status);
-    return L.divIcon({
-      className: '',
-      html: `<div class="status-pin" style="background:${c}"></div>`,
-      iconSize: [12, 12],
-      iconAnchor: [6, 6]
-    });
-  }
-
-  function escapeHtml(str) {
-    return String(str ?? '')
-      .replace(/&/g,'&amp;')
-      .replace(/</g,'&lt;')
-      .replace(/>/g,'&gt;')
-      .replace(/"/g,'&quot;')
-      .replace(/'/g,'&#039;');
-  }
-
-  /* =========================
-     CSV -> FeatureCollection (Google Sheet)
-     ========================= */
-  function parseCSV(text) {
-    const rows = [];
-    let row = [];
-    let cell = '';
-    let inQuotes = false;
-
-    for (let i = 0; i < text.length; i++) {
-      const ch = text[i];
-      const next = text[i + 1];
-
-      if (ch === '"') {
-        if (inQuotes && next === '"') { cell += '"'; i++; }
-        else { inQuotes = !inQuotes; }
-      } else if (ch === ',' && !inQuotes) {
-        row.push(cell); cell = '';
-      } else if ((ch === '\n' || ch === '\r') && !inQuotes) {
-        if (ch === '\r' && next === '\n') i++;
-        row.push(cell);
-        rows.push(row);
-        row = [];
-        cell = '';
-      } else {
-        cell += ch;
-      }
-    }
-    if (cell.length || row.length) {
-      row.push(cell);
-      rows.push(row);
-    }
-    return rows;
-  }
-
-  function csvToObjects(csvText) {
-    const grid = parseCSV(csvText).filter(r => r.some(c => String(c).trim() !== ''));
-    if (!grid.length) return [];
-    const headers = grid[0].map(h => String(h).trim());
-    const out = [];
-    for (let i = 1; i < grid.length; i++) {
-      const r = grid[i];
-      const obj = {};
-      headers.forEach((h, j) => { obj[h] = (r[j] ?? '').toString().trim(); });
-      out.push(obj);
-    }
-    return out;
-  }
-
-  function toNumberOrNull(v) {
-    const n = Number(String(v ?? '').trim());
-    return Number.isFinite(n) ? n : null;
-  }
-
-  function normalizeProps(obj) {
-    const p = { ...obj };
-    if ('beneficiaries_planned' in p) p.beneficiaries_planned = toNumberOrNull(p.beneficiaries_planned);
-    if ('beneficiaries_reached_to_date' in p) p.beneficiaries_reached_to_date = toNumberOrNull(p.beneficiaries_reached_to_date);
-    return p;
-  }
-
-  function csvToFeatureCollection(csvText) {
-    const rows = csvToObjects(csvText);
-    const features = [];
-
-    for (const r of rows) {
-      const lat = toNumberOrNull(r.latitude);
-      const lon = toNumberOrNull(r.longitude);
-      if (lat == null || lon == null) continue;
-
-      const props = normalizeProps(r);
-
+  if(cell||row.length){row.push(cell);rows.push(row);}
+  return rows;
+}
+function csvToFeatureCollection(csv){
+  const grid=parseCSV(csv).filter(r=>r.some(c=>c.trim()!==''));
+  const headers=grid[0].map(h=>h.trim());
+  const features=[];
+  grid.slice(1).forEach(r=>{
+    const obj={};
+    headers.forEach((h,i)=>obj[h]=(r[i]||'').trim());
+    if(obj.latitude&&obj.longitude){
       features.push({
-        type: 'Feature',
-        geometry: { type: 'Point', coordinates: [lon, lat] },
-        properties: props
+        type:'Feature',
+        geometry:{type:'Point',coordinates:[+obj.longitude,+obj.latitude]},
+        properties:obj
       });
     }
+  });
+  return {type:'FeatureCollection',features};
+}
 
-    return { type: 'FeatureCollection', features };
-  }
+/* =========================
+   FILTERS
+   ========================= */
+function applyFilters(){
+  const org=document.getElementById('filter-org').value;
+  const woreda=document.getElementById('filter-woreda').value;
+  const status=document.getElementById('filter-status').value;
+  const month=document.getElementById('filter-month').value;
+  const outdated=document.getElementById('filter-outdated').checked;
 
-  function interventionPopup(p) {
-    return `
-      <div class="popup-title">${escapeHtml(p.org_name || 'Unknown')}</div>
-      <div class="popup-row"><b>Woreda:</b> ${escapeHtml(p.woreda || '-')}</div>
-      <div class="popup-row"><b>Site:</b> ${escapeHtml(p.site_name || '-')}</div>
-      <div class="popup-row"><b>Status:</b> ${escapeHtml(p.status || '-')}</div>
-      <div class="popup-row"><b>Month:</b> ${escapeHtml(p.period_month || '-')}</div>
-      <div class="popup-row"><b>Planned:</b> ${escapeHtml(p.beneficiaries_planned || '-')}</div>
-      <div class="popup-row"><b>Reached:</b> ${escapeHtml(p.beneficiaries_reached_to_date || '-')}</div>
-      <div class="popup-row"><b>Next:</b> ${escapeHtml(p.next_action || '-')}</div>
-    `;
-  }
+  clusterGroup.clearLayers();
 
-  /* =========================
-     Freshness helpers
-     ========================= */
-  function parseDateLoose(v) {
-    if (!v) return null;
-    if (v instanceof Date && !isNaN(v)) return v;
-    if (typeof v === 'number') {
-      const d = new Date(v);
-      return isNaN(d) ? null : d;
+  const filtered=interventionsData.features.filter(f=>{
+    const p=f.properties;
+    if(org&&p.org_name!==org)return false;
+    if(woreda&&p.woreda!==woreda)return false;
+    if(status&&p.status.toLowerCase()!==status)return false;
+    if(month&&p.period_month!==month)return false;
+    if(outdated&&p.last_update){
+      const days=(Date.now()-new Date(p.last_update))/86400000;
+      if(days<=21)return false;
     }
-    const s = String(v).trim();
-    if (!s) return null;
-
-    const m = s.match(/^(\d{4})[-\/](\d{2})[-\/](\d{2})/);
-    if (m) {
-      const y = Number(m[1]), mo = Number(m[2]) - 1, d0 = Number(m[3]);
-      const d = new Date(y, mo, d0);
-      return isNaN(d) ? null : d;
-    }
-
-    const d = new Date(s);
-    return isNaN(d) ? null : d;
-  }
-
-  function freshnessFromLastUpdate(lastUpdate) {
-    const d = parseDateLoose(lastUpdate);
-    if (!d) return { band: 'na', color: '#bdbdbd', title: 'No last_update', days: null };
-    const now = new Date();
-    const diffMs = now - d;
-    const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-    if (!isFinite(days) || days < 0) return { band: 'na', color: '#bdbdbd', title: 'Invalid last_update', days: null };
-    if (days <= 7)  return { band: 'green',  color: '#2ca02c', title: `${days} day(s) old`, days };
-    if (days <= 21) return { band: 'orange', color: '#ff7f0e', title: `${days} day(s) old`, days };
-    return { band: 'red', color: '#d62728', title: `${days} day(s) old`, days };
-  }
-
-  function freshnessRank(band) {
-    if (band === 'red') return 3;
-    if (band === 'orange') return 2;
-    if (band === 'green') return 1;
-    return 0;
-  }
-
-  function updateKpi(features) {
-    let upToDate = 0, outdated = 0, noDate = 0;
-
-    for (const f of features) {
-      const p = f.properties || {};
-      const fr = freshnessFromLastUpdate(p.last_update);
-      if (fr.band === 'na') noDate++;
-      else if (fr.band === 'red') outdated++;
-      else upToDate++;
-    }
-
-    const el = document.getElementById('sidebar-kpi');
-    el.innerHTML = `
-      <span class="kpi-chip" title="Updated within 21 days">
-        <span class="kpi-dot" style="background:#2ca02c"></span>
-        Up-to-date: <b>${upToDate}</b>
-      </span>
-      <span class="kpi-chip" title="Older than 21 days">
-        <span class="kpi-dot" style="background:#d62728"></span>
-        Outdated: <b>${outdated}</b>
-      </span>
-      <span class="kpi-chip" title="Missing or invalid last_update">
-        <span class="kpi-dot" style="background:#bdbdbd"></span>
-        No date: <b>${noDate}</b>
-      </span>
-    `;
-  }
-
-  function downloadCsv(filename, rows) {
-    const escapeCsv = (v) => {
-      const s = String(v ?? '');
-      if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
-      return s;
-    };
-    const csv = rows.map(r => r.map(escapeCsv).join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(a.href);
-  }
-
-  /* =========================
-     ADM0 – Ethiopia
-     ========================= */
-  fetch(ETH_ADM0_URL).then(r=>r.json()).then(fc=>{
-    L.geoJSON(fc,{style:{color:'#000',weight:2,fillOpacity:0}}).addTo(map);
+    return true;
   });
 
-  /* =========================
-     ADM1 – Benishangul-Gumuz
-     ========================= */
-  fetch(ETH_ADM1_URL).then(r=>r.json()).then(fc=>{
-    const ben = (fc.features || []).filter(f=>f.properties?.adm1_pcode==='ET06');
-    const layer = L.geoJSON({type:'FeatureCollection',features:ben},{
-      style:{color:'#ff0000',weight:3,fillOpacity:0}
-    }).addTo(map);
-    map.fitBounds(layer.getBounds(),{padding:[30,30]});
+  const layer=L.geoJSON({type:'FeatureCollection',features:filtered},{
+    pointToLayer:(f,latlng)=>L.marker(latlng,{icon:statusIcon(f.properties.status)})
+  });
+  clusterGroup.addLayer(layer);
+
+  document.getElementById('sidebar-count').textContent=filtered.length+' shown';
+}
+
+/* =========================
+   LOAD DATA
+   ========================= */
+fetch(INTERVENTIONS_URL)
+.then(r=>r.text())
+.then(csv=>{
+  interventionsData=csvToFeatureCollection(csv);
+
+  const orgs=[...new Set(interventionsData.features.map(f=>f.properties.org_name).filter(Boolean))].sort();
+  const months=[...new Set(interventionsData.features.map(f=>f.properties.period_month).filter(Boolean))].sort();
+  const woredas=[...new Set(interventionsData.features.map(f=>f.properties.woreda).filter(Boolean))].sort();
+
+  orgs.forEach(o=>{
+    const opt=document.createElement('option');
+    opt.value=o; opt.textContent=o;
+    document.getElementById('filter-org').appendChild(opt);
+  });
+  months.forEach(m=>{
+    const opt=document.createElement('option');
+    opt.value=m; opt.textContent=m;
+    document.getElementById('filter-month').appendChild(opt);
+  });
+  woredas.forEach(w=>{
+    const opt=document.createElement('option');
+    opt.value=w; opt.textContent=w;
+    document.getElementById('filter-woreda').appendChild(opt);
   });
 
-  /* =========================
-     ADM3 – Woredas
-     ========================= */
-  fetch(ETH_ADM3_URL).then(r=>r.json()).then(fc=>{
-    L.geoJSON(fc,{
-      style:{color:'#666',weight:1,fillOpacity:0},
-      onEachFeature:(f,l)=>{
-        l.bindPopup(escapeHtml(
-          f.properties.adm3_name || f.properties.adm3_name1 || 'Woreda'
-        ));
-      }
-    }).addTo(map);
-  });
+  ['filter-org','filter-woreda','filter-status','filter-month','filter-outdated']
+    .forEach(id=>document.getElementById(id).addEventListener('change',applyFilters));
 
-  /* =========================
-     LEGEND (Leaflet control)
-     ========================= */
-  const legend = L.control({ position: 'bottomright' });
-  legend.onAdd = function () {
-    const div = L.DomUtil.create('div');
-    div.style.background = 'white';
-    div.style.padding = '8px';
-    div.style.borderRadius = '6px';
-    div.style.boxShadow = '0 0 6px rgba(0,0,0,0.3)';
-    div.style.fontSize = '13px';
-    div.innerHTML = `
-      <strong>Status</strong>
-      <div class="legend-row"><span class="dot planned"></span> Planned</div>
-      <div class="legend-row"><span class="dot ongoing"></span> Ongoing</div>
-      <div class="legend-row"><span class="dot completed"></span> Completed</div>
-      <div class="legend-row"><span class="dot paused"></span> Paused</div>
-    `;
-    return div;
-  };
-  legend.addTo(map);
+  applyFilters();
+})
+.catch(e=>console.error(e));
 
-  /* =========================
-     INTERVENTIONS + FILTERS + CLUSTERING + SIDEBAR
-     ========================= */
-  let interventionsData = null;
-
-  const clusterGroup = L.markerClusterGroup({
-    showCoverageOnHover: false,
-    spiderfyOnMaxZoom: true,
-    disableClusteringAtZoom: 12
-  });
-  map.addLayer(clusterGroup);
-
-  let currentDisplayedFeatures = [];
-
-  function renderSidebar(features, markersIndex) {
-    const list = document.getElementById('sidebar-list');
-    const count = document.getElementById('sidebar-count');
-    list.innerHTML = '';
-    count.textContent = `${features.length} shown`;
-
-    const sorted = [...features].sort((a, b) => {
-      const pa = a.properties || {};
-      const pb = b.properties || {};
-      const fa = freshnessFromLastUpdate(pa.last_update);
-      const fb = freshnessFromLastUpdate(pb.last_update);
-
-      const ra = freshnessRank(fa.band);
-      const rb = freshnessRank(fb.band);
-      if (rb !== ra) return rb - ra;
-
-      const da = (fa.days == null) ? -1 : fa.days;
-      const db = (fb.days == null) ? -1 : fb.days;
-      return db - da;
-    });
-
-    for (const f of sorted) {
-      const p = f.properties || {};
-      const id = String(p.record_id || p.id || `${p.org_name}-${p.site_name}-${p.period_month}`);
-      const status = String(p.status || '').toLowerCase();
-      const color = statusColor(status);
-
-      const org = p.org_name || 'Unknown';
-      const woreda = p.woreda || '-';
-      const site = p.site_name || '-';
-      const month = p.period_month || '-';
-
-      const fr = freshnessFromLastUpdate(p.last_update);
-      const freshnessDot = `
-        <span
-          class="fresh-dot"
-          title="${escapeHtml(fr.title)} (last_update: ${escapeHtml(p.last_update || 'n/a')})"
-          style="
-            display:inline-block;
-            width:10px;height:10px;
-            border-radius:50%;
-            background:${fr.color};
-            margin-left:8px;
-            vertical-align:middle;
-          ">
-        </span>
-      `;
-
-      const row = document.createElement('div');
-      row.className = 'item';
-      row.dataset.id = id;
-
-      row.innerHTML = `
-        <div class="item-top">
-          <div class="item-main">
-            ${escapeHtml(org)} ${freshnessDot}
-          </div>
-          <div class="badge" style="background:${color}">${escapeHtml(status || '-')}</div>
-        </div>
-        <div class="item-sub">${escapeHtml(woreda)} — ${escapeHtml(site)}</div>
-        <div class="item-sub">${escapeHtml(month)}</div>
-      `;
-
-      row.addEventListener('click', () => {
-        const m = markersIndex.get(id);
-        if (!m) return;
-        map.setView(m.getLatLng(), Math.max(map.getZoom(), 11), { animate: true });
-        m.openPopup();
-      });
-
-      list.appendChild(row);
-    }
-  }
-
-  function applyFilters() {
-    const org = document.getElementById('filter-org').value;
-    const status = document.getElementById('filter-status').value;
-    const month = document.getElementById('filter-month').value;
-    const outdatedOnly = document.getElementById('filter-outdated').checked;
-
-    clusterGroup.clearLayers();
-
-    const baseFiltered = interventionsData.features.filter(f => {
-      const p = f.properties || {};
-      if (org && p.org_name !== org) return false;
-      if (status && String(p.status).toLowerCase() !== status) return false;
-      if (month && p.period_month !== month) return false;
-      return true;
-    });
-
-    updateKpi(baseFiltered);
-
-    const filtered = outdatedOnly
-      ? baseFiltered.filter(f => {
-          const p = f.properties || {};
-          const fr = freshnessFromLastUpdate(p.last_update);
-          return fr.band === 'red';
-        })
-      : baseFiltered;
-
-    currentDisplayedFeatures = filtered;
-
-    document.getElementById('btn-export').disabled = (filtered.length === 0);
-
-    const markersIndex = new Map();
-
-    const layer = L.geoJSON(
-      { type: 'FeatureCollection', features: filtered },
-      {
-        pointToLayer: (feature, latlng) => {
-          const p = feature.properties || {};
-          const id = String(p.record_id || p.id || `${p.org_name}-${p.site_name}-${p.period_month}`);
-          const marker = L.marker(latlng, { icon: statusIcon(p.status) });
-          markersIndex.set(id, marker);
-          return marker;
-        },
-        onEachFeature: (feature, marker) => {
-          marker.bindPopup(interventionPopup(feature.properties || {}));
-        }
-      }
-    );
-
-    clusterGroup.addLayer(layer);
-    renderSidebar(filtered, markersIndex);
-  }
-
-  document.getElementById('btn-export').addEventListener('click', () => {
-    const rows = [];
-    rows.push([
-      'org_name','cluster','zone','woreda','site_name','status','period_month','last_update','days_old'
-    ]);
-
-    for (const f of currentDisplayedFeatures) {
-      const p = f.properties || {};
-      const fr = freshnessFromLastUpdate(p.last_update);
-      rows.push([
-        p.org_name || '',
-        p.cluster || '',
-        p.zone || '',
-        p.woreda || '',
-        p.site_name || '',
-        p.status || '',
-        p.period_month || '',
-        p.last_update || '',
-        (fr.days == null ? '' : fr.days)
-      ]);
-    }
-
-    const ts = new Date().toISOString().slice(0, 10);
-    downloadCsv(`interventions_export_${ts}.csv`, rows);
-  });
-
-  fetch(INTERVENTIONS_URL)
-    .then(r => r.text())
-    .then(csvText => {
-      const fc = csvToFeatureCollection(csvText);
-      interventionsData = fc;
-
-      const orgs = [...new Set(fc.features.map(f => (f.properties.org_name || '').trim()).filter(Boolean))].sort();
-      const months = [...new Set(fc.features.map(f => (f.properties.period_month || '').trim()).filter(Boolean))].sort();
-
-      const orgSel = document.getElementById('filter-org');
-      orgs.forEach(o => {
-        const opt = document.createElement('option');
-        opt.value = o;
-        opt.textContent = o;
-        orgSel.appendChild(opt);
-      });
-
-      const monthSel = document.getElementById('filter-month');
-      months.forEach(m => {
-        const opt = document.createElement('option');
-        opt.value = m;
-        opt.textContent = m;
-        monthSel.appendChild(opt);
-      });
-
-      ['filter-org','filter-status','filter-month','filter-outdated']
-        .forEach(id => document.getElementById(id).addEventListener('change', applyFilters));
-
-      document.getElementById('btn-export').disabled = true;
-
-      applyFilters();
-    })
-    .catch(err => console.error('Interventions load error:', err));
 </script>
-
 </body>
 </html>
