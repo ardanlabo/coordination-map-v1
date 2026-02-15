@@ -147,8 +147,11 @@
     .dot.paused { background: #ff7f0e; }
 
     /* Popup */
-    .popup-title { font-weight: 700; margin-bottom: 6px; }
-    .popup-row { margin: 2px 0; }
+    .popup-title { font-weight: 800; margin-bottom: 8px; font-size: 14px; }
+    .popup-grid { display:block; }
+    .popup-row { margin: 2px 0; font-size: 12px; line-height: 16px; }
+    .popup-k { font-weight: 700; }
+    .popup-hr { border:0; border-top:1px solid #eee; margin:8px 0; }
 
     /* Colored marker for clustering (divIcon) */
     .status-pin{
@@ -176,7 +179,6 @@
   <div class="sidebar-header">
     <div class="sidebar-title">Interventions</div>
     <div id="sidebar-count" class="sidebar-count">0 shown</div>
-
     <div id="sidebar-kpi"></div>
   </div>
   <div id="sidebar-list" class="sidebar-list"></div>
@@ -191,7 +193,6 @@
     <option value="">All</option>
   </select>
 
-  <!-- ✅ NEW: Woreda filter -->
   <label>Woreda</label>
   <select id="filter-woreda">
     <option value="">All</option>
@@ -370,16 +371,74 @@
     return { type: 'FeatureCollection', features };
   }
 
+  /* =========================
+     Popup: full info except contacts/emails
+     ========================= */
+  function normalizeKeyLabel(k) {
+    return String(k || '')
+      .replace(/_/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .replace(/^\w/, c => c.toUpperCase());
+  }
+
+  function shouldHideKey(k) {
+    const s = String(k || '').toLowerCase();
+    // exclude contacts/emails (and typical variants)
+    if (s.includes('email') || s.includes('e-mail') || s.includes('mail')) return true;
+    if (s.includes('contact')) return true;
+    // optional: hide raw coords fields if you consider them noise
+    // (leave them visible if you prefer)
+    // if (s === 'latitude' || s === 'longitude') return true;
+    return false;
+  }
+
   function interventionPopup(p) {
+    const org = p.org_name || 'Unknown';
+    const woreda = p.woreda || '-';
+    const site = p.site_name || '-';
+    const status = p.status || '-';
+    const month = p.period_month || '-';
+
+    // Build ordered block: key fields first, then all remaining
+    const preferredOrder = [
+      'org_name','cluster','zone','woreda','site_name','status','period_month',
+      'last_update','beneficiaries_planned','beneficiaries_reached_to_date','next_action'
+    ];
+
+    const entries = [];
+    const used = new Set();
+
+    for (const k of preferredOrder) {
+      if (k in p && !shouldHideKey(k)) {
+        const v = (p[k] ?? '').toString().trim();
+        if (v !== '') {
+          entries.push([k, v]);
+          used.add(k);
+        }
+      }
+    }
+
+    for (const k of Object.keys(p || {})) {
+      if (used.has(k)) continue;
+      if (shouldHideKey(k)) continue;
+      const v = (p[k] ?? '').toString().trim();
+      if (v === '') continue;
+      entries.push([k, v]);
+    }
+
+    const rowsHtml = entries.map(([k, v]) => {
+      return `<div class="popup-row"><span class="popup-k">${escapeHtml(normalizeKeyLabel(k))}:</span> ${escapeHtml(v)}</div>`;
+    }).join('');
+
     return `
-      <div class="popup-title">${escapeHtml(p.org_name || 'Unknown')}</div>
-      <div class="popup-row"><b>Woreda:</b> ${escapeHtml(p.woreda || '-')}</div>
-      <div class="popup-row"><b>Site:</b> ${escapeHtml(p.site_name || '-')}</div>
-      <div class="popup-row"><b>Status:</b> ${escapeHtml(p.status || '-')}</div>
-      <div class="popup-row"><b>Month:</b> ${escapeHtml(p.period_month || '-')}</div>
-      <div class="popup-row"><b>Planned:</b> ${escapeHtml(p.beneficiaries_planned || '-')}</div>
-      <div class="popup-row"><b>Reached:</b> ${escapeHtml(p.beneficiaries_reached_to_date || '-')}</div>
-      <div class="popup-row"><b>Next:</b> ${escapeHtml(p.next_action || '-')}</div>
+      <div class="popup-title">${escapeHtml(org)}</div>
+      <div class="popup-row"><span class="popup-k">Woreda:</span> ${escapeHtml(woreda)}</div>
+      <div class="popup-row"><span class="popup-k">Site:</span> ${escapeHtml(site)}</div>
+      <div class="popup-row"><span class="popup-k">Status:</span> ${escapeHtml(status)}</div>
+      <div class="popup-row"><span class="popup-k">Month:</span> ${escapeHtml(month)}</div>
+      <hr class="popup-hr"/>
+      <div class="popup-grid">${rowsHtml || '<div class="popup-row">No details available.</div>'}</div>
     `;
   }
 
@@ -614,10 +673,10 @@
   }
 
   function applyFilters() {
-    if (!interventionsData || !interventionsData.features) return; // ✅ safety: avoid crash before CSV loaded
+    if (!interventionsData || !interventionsData.features) return;
 
     const org = document.getElementById('filter-org').value;
-    const woreda = document.getElementById('filter-woreda').value; // ✅ NEW
+    const woreda = document.getElementById('filter-woreda').value;
     const status = document.getElementById('filter-status').value;
     const month = document.getElementById('filter-month').value;
     const outdatedOnly = document.getElementById('filter-outdated').checked;
@@ -627,7 +686,7 @@
     const baseFiltered = interventionsData.features.filter(f => {
       const p = f.properties || {};
       if (org && p.org_name !== org) return false;
-      if (woreda && p.woreda !== woreda) return false; // ✅ NEW
+      if (woreda && p.woreda !== woreda) return false;
       if (status && String(p.status).toLowerCase() !== status) return false;
       if (month && p.period_month !== month) return false;
       return true;
@@ -696,13 +755,16 @@
   });
 
   fetch(INTERVENTIONS_URL)
-    .then(r => r.text())
+    .then(r => {
+      if (!r.ok) throw new Error(`CSV fetch failed: ${r.status} ${r.statusText}`);
+      return r.text();
+    })
     .then(csvText => {
       const fc = csvToFeatureCollection(csvText);
       interventionsData = fc;
 
       const orgs = [...new Set(fc.features.map(f => (f.properties.org_name || '').trim()).filter(Boolean))].sort();
-      const woredas = [...new Set(fc.features.map(f => (f.properties.woreda || '').trim()).filter(Boolean))].sort(); // ✅ NEW
+      const woredas = [...new Set(fc.features.map(f => (f.properties.woreda || '').trim()).filter(Boolean))].sort();
       const months = [...new Set(fc.features.map(f => (f.properties.period_month || '').trim()).filter(Boolean))].sort();
 
       const orgSel = document.getElementById('filter-org');
@@ -713,7 +775,7 @@
         orgSel.appendChild(opt);
       });
 
-      const woredaSel = document.getElementById('filter-woreda'); // ✅ NEW
+      const woredaSel = document.getElementById('filter-woreda');
       woredas.forEach(w => {
         const opt = document.createElement('option');
         opt.value = w;
@@ -729,7 +791,7 @@
         monthSel.appendChild(opt);
       });
 
-      ['filter-org','filter-woreda','filter-status','filter-month','filter-outdated'] // ✅ NEW: woreda in listeners
+      ['filter-org','filter-woreda','filter-status','filter-month','filter-outdated']
         .forEach(id => document.getElementById(id).addEventListener('change', applyFilters));
 
       document.getElementById('btn-export').disabled = true;
