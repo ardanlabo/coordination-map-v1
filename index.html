@@ -137,6 +137,7 @@
   <div class="topbar">
     <h1>Coordination Dashboard — Benishangul-Gumuz (Nutrition)</h1>
     <div class="actions">
+      <!-- ✅ changed: default link points to full map (no embed) -->
       <a class="btn" id="btn-open-map" href="./map.html" target="_blank" rel="noopener">Open full map</a>
       <button class="btn" type="button" disabled title="Coming soon">Update data (coming soon)</button>
     </div>
@@ -229,8 +230,12 @@
         </div>
         <div class="bd" style="padding:0;">
           <div class="miniMapBox miniMapLink">
+            <!-- ✅ keep preview embedded -->
             <iframe class="miniMapFrame" id="miniMapFrame" src="./map.html?embed=1" title="Map preview" loading="lazy"></iframe>
+
+            <!-- ✅ changed: overlay opens full map (no embed) -->
             <a class="miniMapOverlay" id="miniMapOverlay" href="./map.html" target="_blank" rel="noopener" aria-label="Open full map"></a>
+
             <div class="miniMapHint">Click to open full map</div>
           </div>
         </div>
@@ -244,7 +249,10 @@
   // CONFIG
   // =========================
   const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR_vGAsaVP8WM3PKX1SEcNSit7Ldh5SjwM9c-F01nmS-mDghFpNHcARtVDOzo1Qc7okT2be-Oi05msp/pub?output=csv";
-  const MAP_URL = "./map.html";
+
+  // ✅ split URLs: preview stays embed, clicks go to full
+  const MAP_PREVIEW_URL = "./map.html?embed=1";
+  const MAP_FULL_URL = "./map.html";
 
   // =========================
   // Helpers
@@ -683,9 +691,9 @@
 
   function main(){
     // Wire map links
-    $('btn-open-map').href = MAP_URL;
-    $('miniMapFrame').src = MAP_URL;
-    $('miniMapOverlay').href = MAP_URL;
+    $('btn-open-map').href = MAP_FULL_URL;      // ✅ full map
+    $('miniMapFrame').src = MAP_PREVIEW_URL;    // ✅ preview embed
+    $('miniMapOverlay').href = MAP_FULL_URL;    // ✅ full map
 
     const statusEl = $('load-status');
     statusEl.textContent = 'Loading CSV…';
