@@ -191,7 +191,7 @@
     <option value="">All</option>
   </select>
 
-  <!-- ✅ ADDED: Woreda filter -->
+  <!-- ✅ NEW: Woreda filter -->
   <label>Woreda</label>
   <select id="filter-woreda">
     <option value="">All</option>
@@ -614,8 +614,10 @@
   }
 
   function applyFilters() {
+    if (!interventionsData || !interventionsData.features) return; // ✅ safety: avoid crash before CSV loaded
+
     const org = document.getElementById('filter-org').value;
-    const woreda = document.getElementById('filter-woreda').value;   // ✅ ADDED
+    const woreda = document.getElementById('filter-woreda').value; // ✅ NEW
     const status = document.getElementById('filter-status').value;
     const month = document.getElementById('filter-month').value;
     const outdatedOnly = document.getElementById('filter-outdated').checked;
@@ -625,7 +627,7 @@
     const baseFiltered = interventionsData.features.filter(f => {
       const p = f.properties || {};
       if (org && p.org_name !== org) return false;
-      if (woreda && p.woreda !== woreda) return false;              // ✅ ADDED
+      if (woreda && p.woreda !== woreda) return false; // ✅ NEW
       if (status && String(p.status).toLowerCase() !== status) return false;
       if (month && p.period_month !== month) return false;
       return true;
@@ -700,8 +702,8 @@
       interventionsData = fc;
 
       const orgs = [...new Set(fc.features.map(f => (f.properties.org_name || '').trim()).filter(Boolean))].sort();
+      const woredas = [...new Set(fc.features.map(f => (f.properties.woreda || '').trim()).filter(Boolean))].sort(); // ✅ NEW
       const months = [...new Set(fc.features.map(f => (f.properties.period_month || '').trim()).filter(Boolean))].sort();
-      const woredas = [...new Set(fc.features.map(f => (f.properties.woreda || '').trim()).filter(Boolean))].sort(); // ✅ ADDED
 
       const orgSel = document.getElementById('filter-org');
       orgs.forEach(o => {
@@ -711,8 +713,8 @@
         orgSel.appendChild(opt);
       });
 
-      const woredaSel = document.getElementById('filter-woreda'); // ✅ ADDED
-      woredas.forEach(w => {                                     // ✅ ADDED
+      const woredaSel = document.getElementById('filter-woreda'); // ✅ NEW
+      woredas.forEach(w => {
         const opt = document.createElement('option');
         opt.value = w;
         opt.textContent = w;
@@ -727,7 +729,7 @@
         monthSel.appendChild(opt);
       });
 
-      ['filter-org','filter-woreda','filter-status','filter-month','filter-outdated']  // ✅ UPDATED
+      ['filter-org','filter-woreda','filter-status','filter-month','filter-outdated'] // ✅ NEW: woreda in listeners
         .forEach(id => document.getElementById(id).addEventListener('change', applyFilters));
 
       document.getElementById('btn-export').disabled = true;
